@@ -1,0 +1,16 @@
+cidr_block,country_code,country_name
+103.21.240.0/20,VN,Vietnam
+103.7.32.0/19,SG,Singapore
+192.168.0.0/16,US,United States
+198.51.100.0/24,US,United States
+203.0.112.0/20,JP,Japan
+185.220.96.0/19,DE,Germany
+51.15.0.0/16,FR,France
+151.101.0.0/16,GB,United Kingdom
+210.140.0.0/16,KR,South Korea
+139.130.0.0/16,AU,Australia
+145.220.0.0/16,NL,Netherlands
+200.160.0.0/16,BR,Brazil
+106.51.0.0/16,IN,India
+116.206.0.0/16,TW,Taiwan
+194.67.192.0/18,SE,Sweden
