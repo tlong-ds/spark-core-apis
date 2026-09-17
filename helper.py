@@ -28,18 +28,33 @@ def resolve_ip(ip_str: str, ip_country_map: dict) -> str:
     return "Unknown"
 
 
-def create_comparison_df(spark, rdd_metrics: dict, df_metrics: dict):
+def create_comparison_df(spark, rdd_metrics: dict, df_metrics: dict, hybrid_metrics: dict = None):
     """Build a structured Spark DataFrame for the quantitative comparison matrix."""
-    parity = "PASS (100% Match)" if rdd_metrics["results"] == df_metrics["results"] else "FAIL (Mismatch)"
-    speedup = df_metrics["time"] / rdd_metrics["time"] if rdd_metrics["time"] > 0 else 1.0
+    parity_rdd_df = "PASS (100% Match)" if rdd_metrics["results"] == df_metrics["results"] else "FAIL (Mismatch)"
 
+    if hybrid_metrics:
+        parity_hybrid = "PASS (100% Match)" if rdd_metrics["results"] == hybrid_metrics["results"] else "FAIL (Mismatch)"
+        speedup_df = df_metrics["time"] / rdd_metrics["time"] if rdd_metrics["time"] > 0 else 1.0
+        speedup_hybrid = rdd_metrics["time"] / hybrid_metrics["time"] if hybrid_metrics["time"] > 0 else 1.0
+
+        rows = [
+            ("Execution Latency", f"{rdd_metrics['time']:.2f}s", f"{df_metrics['time']:.2f}s", f"{hybrid_metrics['time']:.2f}s ({speedup_hybrid:.2f}x faster)"),
+            ("Spark Actions / Jobs Triggered", str(rdd_metrics["actions"]), str(df_metrics["actions"]), str(hybrid_metrics["actions"])),
+            ("Storage File Scan Passes", str(rdd_metrics["scans"]), str(df_metrics["scans"]), str(hybrid_metrics["scans"])),
+            ("CIDR Geolocation Operator", rdd_metrics["operator"], df_metrics["operator"], hybrid_metrics["operator"]),
+            ("Corrupt Lines Audited", f"{rdd_metrics['corrupt']:,d}", f"{df_metrics['corrupt']:,d}", f"{hybrid_metrics['corrupt']:,d}"),
+            ("Top-10 Checksum Parity", parity_rdd_df, parity_rdd_df, parity_hybrid),
+        ]
+        return spark.createDataFrame(rows, ["metric", "low_level_rdd", "high_level_dataframe", "hybrid_rdd_dataframe"])
+
+    speedup = df_metrics["time"] / rdd_metrics["time"] if rdd_metrics["time"] > 0 else 1.0
     rows = [
         ("Execution Latency", f"{rdd_metrics['time']:.2f}s", f"{df_metrics['time']:.2f}s ({speedup:.2f}x)"),
         ("Spark Actions / Jobs Triggered", str(rdd_metrics["actions"]), str(df_metrics["actions"])),
         ("Storage File Scan Passes", str(rdd_metrics["scans"]), str(df_metrics["scans"])),
         ("CIDR Geolocation Operator", rdd_metrics["operator"], df_metrics["operator"]),
         ("Corrupt Lines Audited", f"{rdd_metrics['corrupt']:,d}", f"{df_metrics['corrupt']:,d}"),
-        ("Top-10 Checksum Parity", parity, parity),
+        ("Top-10 Checksum Parity", parity_rdd_df, parity_rdd_df),
     ]
     return spark.createDataFrame(rows, ["metric", "low_level_rdd", "high_level_dataframe"])
 

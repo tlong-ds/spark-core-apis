@@ -123,16 +123,59 @@ def execute_dataframe_job(spark, input_path: str, ip_country_map: dict):
     }
 
 
+def execute_hybrid_job(sc, spark, input_path: str, ip_country_map: dict):
+    """
+    Hybrid Architecture:
+    1. Low-level RDD for map-side parsing, single-pass in-flight Accumulator error tracking,
+       and O(1) in-memory bitwise CIDR lookup via Broadcast variable.
+    2. Convert to DataFrame (.toDF) immediately before the shuffle.
+    3. High-level DataFrame / Tungsten Engine for off-heap HashAggregate and sorting.
+    """
+    broadcast_ip_map = sc.broadcast(ip_country_map)
+    invalid_log_counter = sc.accumulator(0)
+
+    t0 = time.perf_counter()
+
+    raw_rdd = sc.textFile(input_path)
+    unpacked_rdd = unpack_compound_logs(raw_rdd)
+    parsed_rdd   = parse_and_audit_logs(unpacked_rdd, invalid_log_counter)
+    filtered_rdd = filter_successful_requests(parsed_rdd)
+    enriched_rdd = filtered_rdd.map(lambda record: (resolve_ip(record[0], broadcast_ip_map.value),))
+
+    country_df = enriched_rdd.toDF(["country"])
+    aggregated_df = (
+        country_df
+        .groupBy("country")
+        .count()
+        .withColumnRenamed("count", "access_count")
+        .orderBy(col("access_count").desc())
+    )
+
+    results = aggregated_df.take(10)
+    elapsed = time.perf_counter() - t0
+
+    return {
+        "time": elapsed,
+        "corrupt": invalid_log_counter.value,
+        "actions": 1,
+        "scans": 1,
+        "operator": "In-Memory Bitwise + Tungsten Agg",
+        "results": {row["country"]: row["access_count"] for row in results},
+        "df": aggregated_df,
+    }
+
+
 # ==============================================================================
 # 3. CLI ENTRY POINT & OUTPUT DISPATCHER
 # ==============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="PySpark Low-Level RDD Logistics Processor")
+    parser = argparse.ArgumentParser(description="PySpark Low-Level RDD & Hybrid Logistics Processor")
     parser.add_argument("--input-path", default="data/raw_logs.txt", help="Path to raw logs text file")
     parser.add_argument("--lookup-path", default="data/ip_geolocation.csv", help="Path to master CIDR lookup CSV")
     parser.add_argument("--output-path", default=None, help="Optional output directory for results")
-    parser.add_argument("--compare", action="store_true", help="Run quantitative RDD vs DataFrame benchmark")
+    parser.add_argument("--hybrid", action="store_true", help="Run optimized Hybrid RDD+DataFrame pipeline")
+    parser.add_argument("--compare", action="store_true", help="Run quantitative 3-way RDD vs DataFrame vs Hybrid benchmark")
     args = parser.parse_args()
 
     spark = SparkSession.builder.appName("RDD_Logistics_Processing").master("local[*]").getOrCreate()
@@ -141,31 +184,49 @@ def main():
 
     ip_country_map = load_ip_country_map(args.lookup_path)
 
-    # Execute RDD pipeline
-    rdd_metrics = execute_rdd_job(sc, spark, args.input_path, ip_country_map)
-
-    print("\n" + "=" * 55)
-    print("        TOP COUNTRIES BY LOGISTICS ACCESS COUNT        ")
-    print("=" * 55)
-    rdd_metrics["df"].show(10, truncate=False)
-
     comparison_df = None
     if args.compare:
+        rdd_metrics = execute_rdd_job(sc, spark, args.input_path, ip_country_map)
         df_metrics = execute_dataframe_job(spark, args.input_path, ip_country_map)
-        comparison_df = create_comparison_df(spark, rdd_metrics, df_metrics)
-        print("\n" + "=" * 60)
-        print("          RDD VS DATAFRAME BENCHMARK MATRIX          ")
-        print("=" * 60)
+        hybrid_metrics = execute_hybrid_job(sc, spark, args.input_path, ip_country_map)
+
+        print("\n" + "=" * 55)
+        print("        TOP COUNTRIES BY LOGISTICS ACCESS COUNT        ")
+        print("=" * 55)
+        hybrid_metrics["df"].show(10, truncate=False)
+
+        comparison_df = create_comparison_df(spark, rdd_metrics, df_metrics, hybrid_metrics)
+        print("\n" + "=" * 75)
+        print("         RDD VS DATAFRAME VS HYBRID BENCHMARK MATRIX          ")
+        print("=" * 75)
         comparison_df.show(truncate=False)
+        active_metrics = hybrid_metrics
+    elif args.hybrid:
+        hybrid_metrics = execute_hybrid_job(sc, spark, args.input_path, ip_country_map)
+        print("\n" + "=" * 55)
+        print("   TOP COUNTRIES BY LOGISTICS ACCESS COUNT (HYBRID)    ")
+        print("=" * 55)
+        hybrid_metrics["df"].show(10, truncate=False)
+        print("=" * 55)
+        print(f"  Execution Time:    {hybrid_metrics['time']:.2f}s")
+        print(f"  Corrupt Lines:     {hybrid_metrics['corrupt']:,d}")
+        print("=" * 55 + "\n")
+        active_metrics = hybrid_metrics
     else:
+        rdd_metrics = execute_rdd_job(sc, spark, args.input_path, ip_country_map)
+        print("\n" + "=" * 55)
+        print("        TOP COUNTRIES BY LOGISTICS ACCESS COUNT        ")
+        print("=" * 55)
+        rdd_metrics["df"].show(10, truncate=False)
         print("=" * 55)
         print(f"  Execution Time:    {rdd_metrics['time']:.2f}s")
         print(f"  Corrupt Lines:     {rdd_metrics['corrupt']:,d}")
         print("=" * 55 + "\n")
+        active_metrics = rdd_metrics
 
     if args.output_path:
         country_output = f"{args.output_path}/country_counts"
-        rdd_metrics["df"].coalesce(1).write.mode("overwrite").csv(country_output, header=True)
+        active_metrics["df"].coalesce(1).write.mode("overwrite").csv(country_output, header=True)
         print(f"Aggregated results saved to: {country_output}")
         if comparison_df is not None:
             comparison_output = f"{args.output_path}/comparison_metrics"
