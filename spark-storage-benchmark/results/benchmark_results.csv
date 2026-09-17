@@ -1,0 +1,5 @@
+format,write_time_sec,output_size_bytes,output_size_mb,num_files,read_query_time_sec
+csv,9.3927,605797497,605.7975,5,14.2595
+json,17.0457,2736443483,2736.4435,5,29.0112
+parquet,8.7478,142627174,142.6272,5,0.8182
+orc,10.1279,177687315,177.6873,5,1.7012

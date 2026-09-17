@@ -1,0 +1,4 @@
+strategy,num_files,output_size_bytes,output_size_mb,write_time_sec
+repartition_20,20,159373327,159.3733,25.1863
+coalesce_2,2,143032196,143.0322,8.7376
+partitionBy_year_month,16,143801211,143.8012,9.4774
