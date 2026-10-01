@@ -1,0 +1,395 @@
+{
+  "metadata": {
+    "dataset": "Kaggle usdot/flight-delays flights.csv",
+    "input_path": "C:\\Users\\HP\\Downloads\\spark-core-apis\\flights.csv",
+    "input_size_bytes": 592406591,
+    "row_count": 5819079,
+    "column_count": 31,
+    "schema": [
+      {
+        "name": "YEAR",
+        "type": "int"
+      },
+      {
+        "name": "MONTH",
+        "type": "int"
+      },
+      {
+        "name": "DAY",
+        "type": "int"
+      },
+      {
+        "name": "DAY_OF_WEEK",
+        "type": "int"
+      },
+      {
+        "name": "AIRLINE",
+        "type": "string"
+      },
+      {
+        "name": "FLIGHT_NUMBER",
+        "type": "int"
+      },
+      {
+        "name": "TAIL_NUMBER",
+        "type": "string"
+      },
+      {
+        "name": "ORIGIN_AIRPORT",
+        "type": "string"
+      },
+      {
+        "name": "DESTINATION_AIRPORT",
+        "type": "string"
+      },
+      {
+        "name": "SCHEDULED_DEPARTURE",
+        "type": "int"
+      },
+      {
+        "name": "DEPARTURE_TIME",
+        "type": "int"
+      },
+      {
+        "name": "DEPARTURE_DELAY",
+        "type": "int"
+      },
+      {
+        "name": "TAXI_OUT",
+        "type": "int"
+      },
+      {
+        "name": "WHEELS_OFF",
+        "type": "int"
+      },
+      {
+        "name": "SCHEDULED_TIME",
+        "type": "int"
+      },
+      {
+        "name": "ELAPSED_TIME",
+        "type": "int"
+      },
+      {
+        "name": "AIR_TIME",
+        "type": "int"
+      },
+      {
+        "name": "DISTANCE",
+        "type": "int"
+      },
+      {
+        "name": "WHEELS_ON",
+        "type": "int"
+      },
+      {
+        "name": "TAXI_IN",
+        "type": "int"
+      },
+      {
+        "name": "SCHEDULED_ARRIVAL",
+        "type": "int"
+      },
+      {
+        "name": "ARRIVAL_TIME",
+        "type": "int"
+      },
+      {
+        "name": "ARRIVAL_DELAY",
+        "type": "int"
+      },
+      {
+        "name": "DIVERTED",
+        "type": "int"
+      },
+      {
+        "name": "CANCELLED",
+        "type": "int"
+      },
+      {
+        "name": "CANCELLATION_REASON",
+        "type": "string"
+      },
+      {
+        "name": "AIR_SYSTEM_DELAY",
+        "type": "int"
+      },
+      {
+        "name": "SECURITY_DELAY",
+        "type": "int"
+      },
+      {
+        "name": "AIRLINE_DELAY",
+        "type": "int"
+      },
+      {
+        "name": "LATE_AIRCRAFT_DELAY",
+        "type": "int"
+      },
+      {
+        "name": "WEATHER_DELAY",
+        "type": "int"
+      }
+    ],
+    "csv_read_partition_count": 5,
+    "spark_sql_files_max_partition_bytes": "134217728b",
+    "spark_sql_files_open_cost_in_bytes": "4194304b",
+    "spark_version": "3.5.9",
+    "python_version": "3.11.9",
+    "master": "local[2]",
+    "spark_sql_adaptive_enabled": "true",
+    "spark_sql_shuffle_partitions": "8",
+    "quantile_relative_error": 0.0001,
+    "profiled_at_utc": "2026-10-01T01:31:37.667523+00:00"
+  },
+  "distinct_row_count": 5819079,
+  "duplicate_row_count": 0,
+  "null_counts": {
+    "AIRLINE": 0,
+    "ARRIVAL_DELAY": 105071,
+    "DEPARTURE_DELAY": 86153,
+    "CANCELLATION_REASON": 5729195,
+    "AIR_SYSTEM_DELAY": 4755640,
+    "SECURITY_DELAY": 4755640,
+    "AIRLINE_DELAY": 4755640,
+    "LATE_AIRCRAFT_DELAY": 4755640,
+    "WEATHER_DELAY": 4755640
+  },
+  "delay_cause_columns": [
+    "AIR_SYSTEM_DELAY",
+    "SECURITY_DELAY",
+    "AIRLINE_DELAY",
+    "LATE_AIRCRAFT_DELAY",
+    "WEATHER_DELAY"
+  ],
+  "delay_cause_null_pattern": {
+    "all_null": 4755640,
+    "all_non_null": 1063439,
+    "partially_null": 0
+  },
+  "carrier_counts": [
+    {
+      "AIRLINE": "WN",
+      "count": 1261855
+    },
+    {
+      "AIRLINE": "DL",
+      "count": 875881
+    },
+    {
+      "AIRLINE": "AA",
+      "count": 725984
+    },
+    {
+      "AIRLINE": "OO",
+      "count": 588353
+    },
+    {
+      "AIRLINE": "EV",
+      "count": 571977
+    },
+    {
+      "AIRLINE": "UA",
+      "count": 515723
+    },
+    {
+      "AIRLINE": "MQ",
+      "count": 294632
+    },
+    {
+      "AIRLINE": "B6",
+      "count": 267048
+    },
+    {
+      "AIRLINE": "US",
+      "count": 198715
+    },
+    {
+      "AIRLINE": "AS",
+      "count": 172521
+    },
+    {
+      "AIRLINE": "NK",
+      "count": 117379
+    },
+    {
+      "AIRLINE": "F9",
+      "count": 90836
+    },
+    {
+      "AIRLINE": "HA",
+      "count": 76272
+    },
+    {
+      "AIRLINE": "VX",
+      "count": 61903
+    }
+  ],
+  "year_month_counts": [
+    {
+      "YEAR": 2015,
+      "MONTH": 1,
+      "count": 469968
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 2,
+      "count": 429191
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 3,
+      "count": 504312
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 4,
+      "count": 485151
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 5,
+      "count": 496993
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 6,
+      "count": 503897
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 7,
+      "count": 520718
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 8,
+      "count": 510536
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 9,
+      "count": 464946
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 10,
+      "count": 486165
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 11,
+      "count": 467972
+    },
+    {
+      "YEAR": 2015,
+      "MONTH": 12,
+      "count": 479230
+    }
+  ],
+  "flight_status_counts": [
+    {
+      "CANCELLED": 0,
+      "DIVERTED": 0,
+      "count": 5714008
+    },
+    {
+      "CANCELLED": 0,
+      "DIVERTED": 1,
+      "count": 15187
+    },
+    {
+      "CANCELLED": 1,
+      "DIVERTED": 0,
+      "count": 89884
+    }
+  ],
+  "nulls_by_flight_status": {
+    "ARRIVAL_DELAY": [
+      {
+        "CANCELLED": 0,
+        "DIVERTED": 0,
+        "rows": 5714008,
+        "nulls": 0
+      },
+      {
+        "CANCELLED": 0,
+        "DIVERTED": 1,
+        "rows": 15187,
+        "nulls": 15187
+      },
+      {
+        "CANCELLED": 1,
+        "DIVERTED": 0,
+        "rows": 89884,
+        "nulls": 89884
+      }
+    ],
+    "DEPARTURE_DELAY": [
+      {
+        "CANCELLED": 0,
+        "DIVERTED": 0,
+        "rows": 5714008,
+        "nulls": 0
+      },
+      {
+        "CANCELLED": 0,
+        "DIVERTED": 1,
+        "rows": 15187,
+        "nulls": 0
+      },
+      {
+        "CANCELLED": 1,
+        "DIVERTED": 0,
+        "rows": 89884,
+        "nulls": 86153
+      }
+    ],
+    "CANCELLATION_REASON": [
+      {
+        "CANCELLED": 0,
+        "DIVERTED": 0,
+        "rows": 5714008,
+        "nulls": 5714008
+      },
+      {
+        "CANCELLED": 0,
+        "DIVERTED": 1,
+        "rows": 15187,
+        "nulls": 15187
+      },
+      {
+        "CANCELLED": 1,
+        "DIVERTED": 0,
+        "rows": 89884,
+        "nulls": 0
+      }
+    ]
+  },
+  "delay_profiles": {
+    "ARRIVAL_DELAY": {
+      "non_null_count": 5714008,
+      "min": -87,
+      "mean": 4.407057357987598,
+      "max": 1971,
+      "quantiles": {
+        "0.5": -5.0,
+        "0.9": 34.0,
+        "0.95": 66.0,
+        "0.99": 167.0
+      }
+    },
+    "DEPARTURE_DELAY": {
+      "non_null_count": 5732926,
+      "min": -82,
+      "mean": 9.370158275198389,
+      "max": 1988,
+      "quantiles": {
+        "0.5": -2.0,
+        "0.9": 35.0,
+        "0.95": 67.0,
+        "0.99": 168.0
+      }
+    }
+  }
+}
