@@ -10,9 +10,12 @@ from pyspark.sql import SparkSession, functions as F
 
 from airline_schema import AIRLINE_SCHEMA
 
-DELAY_COLUMNS = ("ARRIVAL_DELAY", "DEPARTURE_DELAY")
+DELAY_COLUMNS = ("ARRIVAL_DELAY", "DEPARTURE_DELAY", "DISTANCE")
 NULL_COLUMNS = (
     "AIRLINE",
+    "YEAR",
+    "MONTH",
+    "DISTANCE",
     "ARRIVAL_DELAY",
     "DEPARTURE_DELAY",
     "CANCELLATION_REASON",

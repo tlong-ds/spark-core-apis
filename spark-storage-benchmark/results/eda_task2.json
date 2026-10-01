@@ -140,12 +140,15 @@
     "spark_sql_adaptive_enabled": "true",
     "spark_sql_shuffle_partitions": "8",
     "quantile_relative_error": 0.0001,
-    "profiled_at_utc": "2026-10-01T01:31:37.667523+00:00"
+    "profiled_at_utc": "2026-10-01T09:07:44.534534+00:00"
   },
   "distinct_row_count": 5819079,
   "duplicate_row_count": 0,
   "null_counts": {
     "AIRLINE": 0,
+    "YEAR": 0,
+    "MONTH": 0,
+    "DISTANCE": 0,
     "ARRIVAL_DELAY": 105071,
     "DEPARTURE_DELAY": 86153,
     "CANCELLATION_REASON": 5729195,
@@ -389,6 +392,18 @@
         "0.9": 35.0,
         "0.95": 67.0,
         "0.99": 168.0
+      }
+    },
+    "DISTANCE": {
+      "non_null_count": 5819079,
+      "min": 21,
+      "mean": 822.3564947305235,
+      "max": 4983,
+      "quantiles": {
+        "0.5": 647.0,
+        "0.9": 1709.0,
+        "0.95": 2227.0,
+        "0.99": 2588.0
       }
     }
   }
