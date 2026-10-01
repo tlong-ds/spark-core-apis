@@ -1,0 +1,37 @@
+{
+  "benchmark": {
+    "warmup_runs": 1,
+    "measured_runs": 5,
+    "random_seed": 42,
+    "sample_fraction": 1.0
+  },
+  "spark": {
+    "master": "local[2]",
+    "shuffle_partitions": 8,
+    "adaptive_enabled": true
+  },
+  "compression": {
+    "csv": "none",
+    "json": "none",
+    "parquet": "snappy",
+    "orc": "zlib"
+  },
+  "representation": {
+    "formats": ["csv", "json", "parquet", "orc"],
+    "workloads": ["W1", "W2", "W3"]
+  },
+  "layout": {
+    "baseline_partitions": 4,
+    "many_files_partitions": 20,
+    "few_files_partitions": 2
+  },
+  "workloads": {
+    "W2": {
+      "year": 2015,
+      "month": 1
+    },
+    "W2_pushdown": {
+      "arrival_delay_gt": 60
+    }
+  }
+}

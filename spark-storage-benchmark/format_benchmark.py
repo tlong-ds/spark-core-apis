@@ -1,132 +1,162 @@
-"""
-format_benchmark.py
-
-Single-file PySpark benchmark for the "Spark Storage Benchmark" assignment.
-
-It runs two experiments against the Kaggle "flight-delays" dataset
-(https://www.kaggle.com/datasets/usdot/flight-delays), specifically the
-flights.csv file:
-
-  1. File-format benchmark: write the same DataFrame as CSV / JSON /
-     Parquet / ORC, and measure write time, output size, and the time
-     to read + run an aggregation query against each format.
-
-  2. Partition experiment: write the DataFrame as Parquet using
-     repartition(20), coalesce(2), and partitionBy("YEAR", "MONTH"),
-     and record file count, output size, write time, and the resulting
-     file/directory layout.
-
-Designed to be run top-to-bottom in Google Colab, or from the CLI:
-
-    python format_benchmark.py --input data/raw/flights.csv
-
-Results are written to results/*.csv, results/*.json and results/file_layout.txt.
-Progress is logged to logs/benchmark.log (and stdout).
-"""
+"""Reproducible Spark storage-format, layout, and read-behavior benchmark."""
 
 import argparse
 import csv
+import io
+import itertools
 import json
 import logging
 import os
 import platform
+import random
+import re
 import shutil
+import statistics
 import sys
 import time
+from copy import deepcopy
 from datetime import datetime, timezone
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.types import DoubleType, IntegerType, StringType, StructField, StructType
 
-# --------------------------------------------------------------------------
-# Dataset-specific configuration.
-#
-# Column names as they actually appear in the Kaggle flight-delays CSV
-# (https://www.kaggle.com/datasets/usdot/flight-delays) — no renaming is
-# applied, the query below runs against the original columns. Change
-# these constants if you point the script at a different dataset.
-# --------------------------------------------------------------------------
+
 CARRIER_COL = "AIRLINE"
-DELAY_COL = "ARRIVAL_DELAY"
+ARRIVAL_DELAY_COL = "ARRIVAL_DELAY"
+DEPARTURE_DELAY_COL = "DEPARTURE_DELAY"
+DISTANCE_COL = "DISTANCE"
 PARTITION_COLS = ["YEAR", "MONTH"]
-
 FORMATS = ["csv", "json", "parquet", "orc"]
+WORKLOADS = ["W1", "W2", "W3"]
+
+BENCHMARK_SCHEMA = StructType(
+    [
+        StructField(CARRIER_COL, StringType(), True),
+        StructField(ARRIVAL_DELAY_COL, DoubleType(), True),
+        StructField(DEPARTURE_DELAY_COL, DoubleType(), True),
+        StructField(DISTANCE_COL, DoubleType(), True),
+        StructField("YEAR", IntegerType(), True),
+        StructField("MONTH", IntegerType(), True),
+    ]
+)
+
+# The raw Kaggle CSV has these columns in this order. It is parsed explicitly
+# before the six-column logical benchmark dataset is selected.
+SOURCE_SCHEMA = StructType(
+    [
+        StructField("YEAR", IntegerType(), True),
+        StructField("MONTH", IntegerType(), True),
+        StructField("DAY", IntegerType(), True),
+        StructField("DAY_OF_WEEK", IntegerType(), True),
+        StructField(CARRIER_COL, StringType(), True),
+        StructField("FLIGHT_NUMBER", IntegerType(), True),
+        StructField("TAIL_NUMBER", StringType(), True),
+        StructField("ORIGIN_AIRPORT", StringType(), True),
+        StructField("DESTINATION_AIRPORT", StringType(), True),
+        StructField("SCHEDULED_DEPARTURE", IntegerType(), True),
+        StructField("DEPARTURE_TIME", IntegerType(), True),
+        StructField(DEPARTURE_DELAY_COL, DoubleType(), True),
+        StructField("TAXI_OUT", DoubleType(), True),
+        StructField("WHEELS_OFF", IntegerType(), True),
+        StructField("SCHEDULED_TIME", DoubleType(), True),
+        StructField("ELAPSED_TIME", DoubleType(), True),
+        StructField("AIR_TIME", DoubleType(), True),
+        StructField(DISTANCE_COL, DoubleType(), True),
+        StructField("WHEELS_ON", IntegerType(), True),
+        StructField("TAXI_IN", DoubleType(), True),
+        StructField("SCHEDULED_ARRIVAL", IntegerType(), True),
+        StructField("ARRIVAL_TIME", IntegerType(), True),
+        StructField(ARRIVAL_DELAY_COL, DoubleType(), True),
+        StructField("DIVERTED", IntegerType(), True),
+        StructField("CANCELLED", IntegerType(), True),
+        StructField("CANCELLATION_REASON", StringType(), True),
+        StructField("AIR_SYSTEM_DELAY", DoubleType(), True),
+        StructField("SECURITY_DELAY", DoubleType(), True),
+        StructField("AIRLINE_DELAY", DoubleType(), True),
+        StructField("LATE_AIRCRAFT_DELAY", DoubleType(), True),
+        StructField("WEATHER_DELAY", DoubleType(), True),
+    ]
+)
+
+DEFAULT_CONFIG = {
+    "benchmark": {
+        "warmup_runs": 1,
+        "measured_runs": 5,
+        "random_seed": 42,
+        "sample_fraction": 1.0,
+    },
+    "spark": {
+        "master": "local[2]",
+        "shuffle_partitions": 8,
+        "adaptive_enabled": True,
+    },
+    "compression": {"csv": "none", "json": "none", "parquet": "snappy", "orc": "zlib"},
+    "representation": {"formats": FORMATS, "workloads": WORKLOADS},
+    "layout": {"baseline_partitions": 4, "many_files_partitions": 20, "few_files_partitions": 2},
+    "workloads": {"W2": {"year": 2015, "month": 1}, "W2_pushdown": {"arrival_delay_gt": 60}},
+}
 
 logger = logging.getLogger("format_benchmark")
 
 
-# --------------------------------------------------------------------------
-# Logging
-# --------------------------------------------------------------------------
 def setup_logging(logs_dir):
     os.makedirs(logs_dir, exist_ok=True)
-    log_path = os.path.join(logs_dir, "benchmark.log")
-
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
-
-    fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-
-    fh = logging.FileHandler(log_path, mode="a")
-    fh.setFormatter(fmt)
-    logger.addHandler(fh)
-
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setFormatter(fmt)
-    logger.addHandler(ch)
-
-    return log_path
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    file_handler = logging.FileHandler(os.path.join(logs_dir, "benchmark.log"), mode="a")
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
 
-# --------------------------------------------------------------------------
-# Filesystem helpers
-# --------------------------------------------------------------------------
+def load_config(config_path):
+    config = deepcopy(DEFAULT_CONFIG)
+    if not config_path:
+        return config, "python_defaults"
+    with open(config_path, encoding="utf-8") as handle:
+        supplied = json.load(handle)
+    for section, values in supplied.items():
+        if isinstance(values, dict) and isinstance(config.get(section), dict):
+            config[section].update(values)
+        else:
+            config[section] = values
+    return config, os.path.abspath(config_path)
+
+
 def get_dir_size_bytes(path):
-    """Total size of all files under `path` (works for a single file too)."""
     if os.path.isfile(path):
         return os.path.getsize(path)
     total = 0
-    for root, _, files in os.walk(path):
-        for f in files:
-            fp = os.path.join(root, f)
-            if os.path.exists(fp):
-                total += os.path.getsize(fp)
+    for root, _, names in os.walk(path):
+        for name in names:
+            total += os.path.getsize(os.path.join(root, name))
     return total
 
 
-def count_data_files(path):
-    """Count actual data part-files, ignoring Spark's _SUCCESS / .crc markers."""
-    if os.path.isfile(path):
-        return 1
-    n = 0
-    for root, _, files in os.walk(path):
-        for f in files:
-            if f.startswith("_SUCCESS") or f.endswith(".crc"):
+def data_files(path):
+    files = []
+    for root, _, names in os.walk(path):
+        for name in names:
+            if name.startswith("_") or name.startswith(".") or name.endswith(".crc"):
                 continue
-            n += 1
-    return n
+            file_path = os.path.join(root, name)
+            files.append((file_path, os.path.getsize(file_path)))
+    return files
 
 
-def dir_tree_listing(path, max_entries=50):
-    """Readable listing of files under `path` with sizes, for file_layout.txt."""
-    if not os.path.exists(path):
-        return f"{path}/\n  <missing>"
-
-    entries = []
-    for root, _, files in os.walk(path):
-        for f in files:
-            fp = os.path.join(root, f)
-            rel = os.path.relpath(fp, path)
-            entries.append((rel, os.path.getsize(fp)))
-    entries.sort()
-
-    lines = [f"{path}/"]
-    for rel, size in entries[:max_entries]:
-        lines.append(f"  {rel}  ({size:,} bytes)")
-    if len(entries) > max_entries:
-        lines.append(f"  ... {len(entries) - max_entries} more file(s)")
-    lines.append(f"  TOTAL: {len(entries)} file(s), {sum(s for _, s in entries):,} bytes")
-    return "\n".join(lines)
+def storage_metadata(path):
+    sizes = [size for _, size in data_files(path)]
+    return {
+        "output_size_bytes": sum(sizes),
+        "num_data_files": len(sizes),
+        "min_file_size_bytes": min(sizes) if sizes else 0,
+        "median_file_size_bytes": statistics.median(sizes) if sizes else 0,
+        "max_file_size_bytes": max(sizes) if sizes else 0,
+    }
 
 
 def clean_dir(path):
@@ -135,281 +165,344 @@ def clean_dir(path):
 
 
 def warn_if_windows_without_hadoop():
-    """On Windows, Spark's local-filesystem writer goes through Hadoop's
-    filesystem shim, which needs winutils.exe + hadoop.dll on PATH/HADOOP_HOME
-    to do permission checks. Without it, writes fail with:
-        UnsatisfiedLinkError: NativeIO$Windows.access0
-    This isn't a bug in this script — see README.md's Windows section for
-    the fix. We only warn here (don't abort), since some setups configure
-    this outside of HADOOP_HOME (e.g. via PATH only)."""
     if platform.system() == "Windows" and not os.environ.get("HADOOP_HOME"):
         logger.warning(
-            "Running on Windows without HADOOP_HOME set. If writes fail with "
-            "'UnsatisfiedLinkError: NativeIO$Windows.access0', install "
-            "winutils.exe + hadoop.dll and set HADOOP_HOME — see the "
-            "'Windows setup' section in README.md."
+            "Windows is running without HADOOP_HOME. Local Spark writes may require "
+            "winutils.exe and hadoop.dll; see README.md if NativeIO access fails."
         )
 
 
-# --------------------------------------------------------------------------
-# Data loading + the benchmark query
-# --------------------------------------------------------------------------
-def load_source_data(spark, input_path, sample_fraction):
-    logger.info("Reading source dataset from: %s", input_path)
-    df = spark.read.option("header", True).option("inferSchema", True).csv(input_path)
-
+def load_source_data(spark, input_path, sample_fraction, random_seed):
+    logger.info("Reading source dataset with the explicit benchmark schema: %s", input_path)
+    raw_df = (
+        spark.read.option("header", True)
+        .option("inferSchema", False)
+        .schema(SOURCE_SCHEMA)
+        .csv(input_path)
+    )
+    return_df = raw_df.select(*BENCHMARK_SCHEMA.fieldNames())
     if sample_fraction < 1.0:
-        logger.info("Sampling source data at fraction=%s", sample_fraction)
-        df = df.sample(withReplacement=False, fraction=sample_fraction, seed=42)
+        return_df = return_df.sample(withReplacement=False, fraction=sample_fraction, seed=random_seed)
+    return return_df
 
-    cols = df.columns
-    if CARRIER_COL not in cols or DELAY_COL not in cols:
-        raise ValueError(
-            f"Expected columns '{CARRIER_COL}' and '{DELAY_COL}' in the source data. "
-            f"Available columns: {cols}. Update CARRIER_COL/DELAY_COL at the top of "
-            "this script if your source file uses different names."
+
+def aggregate_by_carrier(df):
+    return df.groupBy(CARRIER_COL).agg(
+        F.avg(ARRIVAL_DELAY_COL).alias("avg_arrival_delay"),
+        F.avg(DEPARTURE_DELAY_COL).alias("avg_departure_delay"),
+        F.avg(DISTANCE_COL).alias("avg_distance"),
+        F.count(F.lit(1)).alias("row_count"),
+    )
+
+
+def workload(df, workload_name, config):
+    if workload_name == "W1":
+        selected = df.select(CARRIER_COL, ARRIVAL_DELAY_COL, DEPARTURE_DELAY_COL, DISTANCE_COL)
+        return aggregate_by_carrier(selected)
+    if workload_name == "W2":
+        year = config["workloads"]["W2"]["year"]
+        month = config["workloads"]["W2"]["month"]
+        filtered = df.filter((F.col("YEAR") == year) & (F.col("MONTH") == month))
+        selected = filtered.select(CARRIER_COL, ARRIVAL_DELAY_COL, DEPARTURE_DELAY_COL, DISTANCE_COL)
+        return aggregate_by_carrier(selected)
+    if workload_name == "W3":
+        return df.select(CARRIER_COL, ARRIVAL_DELAY_COL).agg(
+            F.count(F.lit(1)).alias("row_count"),
+            F.min(CARRIER_COL).alias("min_carrier"),
+            F.max(CARRIER_COL).alias("max_carrier"),
+            F.avg(ARRIVAL_DELAY_COL).alias("avg_arrival_delay"),
         )
-
-    df = df.withColumn(DELAY_COL, F.col(DELAY_COL).cast("double"))
-    logger.info("Loaded dataframe with %d columns: %s", len(df.columns), df.columns)
-    return df
+    raise ValueError(f"Unknown workload: {workload_name}")
 
 
-def run_query(df):
-    """The benchmark query used for every format/layout, run against the
-    dataset's original column names (see CARRIER_COL / DELAY_COL above)."""
-    return df.select(CARRIER_COL, DELAY_COL).groupBy(CARRIER_COL).avg(DELAY_COL)
-
-
-# --------------------------------------------------------------------------
-# Benchmark primitives
-# --------------------------------------------------------------------------
-def benchmark_write(path, write_fn):
-    """Run write_fn() (which must write to `path`), timing it and measuring
-    the resulting output on disk."""
-    clean_dir(path)
-    t0 = time.perf_counter()
-    write_fn()
-    elapsed = time.perf_counter() - t0
-    size_bytes = get_dir_size_bytes(path)
-    n_files = count_data_files(path)
-    return elapsed, size_bytes, n_files
-
-
-def benchmark_read_and_query(spark, fmt, path):
-    """Time reading the data back and running the fixed aggregation query,
-    triggered with .collect() so Spark actually executes the plan."""
-    t0 = time.perf_counter()
+def reader_for(spark, fmt, path):
+    reader = spark.read.schema(BENCHMARK_SCHEMA)
     if fmt == "csv":
-        read_df = spark.read.option("header", True).option("inferSchema", True).csv(path)
-    else:
-        read_df = spark.read.format(fmt).load(path)
-    result = run_query(read_df).collect()
-    elapsed = time.perf_counter() - t0
-    return elapsed, len(result)
+        return reader.option("header", True).option("inferSchema", False).csv(path)
+    return reader.format(fmt).load(path)
 
 
-# --------------------------------------------------------------------------
-# Experiment 1: file-format benchmark
-# --------------------------------------------------------------------------
-def run_format_benchmark(spark, df, generated_dir):
-    logger.info("=== Starting file-format benchmark: %s ===", ", ".join(FORMATS))
-    results = []
-
-    for fmt in FORMATS:
-        out_path = os.path.join(generated_dir, f"flights_{fmt}")
-        logger.info("[%s] writing to %s", fmt.upper(), out_path)
-
-        def write_fn(fmt=fmt, out_path=out_path):
-            writer = df.write.mode("overwrite")
-            if fmt == "csv":
-                # Without an explicit header, reading the CSV back loses
-                # column names entirely — needed for a fair read/query step.
-                writer = writer.option("header", True)
-            writer.format(fmt).save(out_path)
-
-        write_time, size_bytes, n_files = benchmark_write(out_path, write_fn)
-        logger.info(
-            "[%s] write_time=%.2fs size=%.2fMB files=%d",
-            fmt.upper(), write_time, size_bytes / 1e6, n_files,
-        )
-
-        read_time, n_groups = benchmark_read_and_query(spark, fmt, out_path)
-        logger.info("[%s] read_query_time=%.2fs result_rows=%d", fmt.upper(), read_time, n_groups)
-
-        results.append(
-            {
-                "format": fmt,
-                "write_time_sec": round(write_time, 4),
-                "output_size_bytes": size_bytes,
-                "output_size_mb": round(size_bytes / 1e6, 4),
-                "num_files": n_files,
-                "read_query_time_sec": round(read_time, 4),
-            }
-        )
-
-    logger.info("=== File-format benchmark complete ===")
-    return results
+def write_dataset(df, path, fmt, compression, transform=None, partition_by=None):
+    clean_dir(path)
+    transformed = transform(df) if transform else df
+    writer = transformed.write.mode("overwrite").option("compression", compression)
+    if fmt == "csv":
+        writer = writer.option("header", True)
+    if partition_by:
+        writer = writer.partitionBy(*partition_by)
+    start = time.perf_counter()
+    writer.format(fmt).save(path)
+    return time.perf_counter() - start
 
 
-# --------------------------------------------------------------------------
-# Experiment 2: partition experiment (Parquet only)
-# --------------------------------------------------------------------------
-def run_partition_experiment(spark, df, generated_dir):
-    logger.info("=== Starting partition experiment (Parquet) ===")
-
-    strategies = {
-        "repartition_20": lambda d: d.repartition(20),
-        # NOTE: coalesce() can only *reduce* partition count. If the source
-        # DataFrame already has fewer partitions than requested here (common
-        # on small/sample files), the output will have fewer files than 2 —
-        # that's expected Spark behavior, not a bug.
-        "coalesce_2": lambda d: d.coalesce(2),
-        "partitionBy_year_month": lambda d: d,  # partitioning happens at write time below
-    }
-
-    results = []
-    layout_sections = []
-
-    for name, transform in strategies.items():
-        out_path = os.path.join(generated_dir, f"partition_{name}")
-        logger.info("[%s] writing to %s", name, out_path)
-
-        def write_fn(name=name, transform=transform, out_path=out_path):
-            transformed = transform(df)
-            writer = transformed.write.mode("overwrite")
-            if name == "partitionBy_year_month":
-                writer = writer.partitionBy(*PARTITION_COLS)
-            writer.parquet(out_path)
-
-        write_time, size_bytes, n_files = benchmark_write(out_path, write_fn)
-        logger.info(
-            "[%s] write_time=%.2fs size=%.2fMB files=%d",
-            name, write_time, size_bytes / 1e6, n_files,
-        )
-
-        results.append(
-            {
-                "strategy": name,
-                "num_files": n_files,
-                "output_size_bytes": size_bytes,
-                "output_size_mb": round(size_bytes / 1e6, 4),
-                "write_time_sec": round(write_time, 4),
-            }
-        )
-
-        layout_sections.append(f"### Strategy: {name}\n" + dir_tree_listing(out_path))
-
-    logger.info("=== Partition experiment complete ===")
-    return results, "\n\n".join(layout_sections)
-
-
-# --------------------------------------------------------------------------
-# Metadata + results output
-# --------------------------------------------------------------------------
-def collect_metadata(spark, input_path, sample_fraction, row_count):
-    input_size = get_dir_size_bytes(input_path) if os.path.exists(input_path) else None
+def summary_row(rows):
+    runtimes = [float(row["runtime_sec"]) for row in rows]
     return {
-        "dataset": "usdot/flight-delays (Kaggle)",
-        "input_path": input_path,
-        "input_size_bytes": input_size,
-        "input_size_mb": round(input_size / 1e6, 4) if input_size else None,
-        "sample_fraction": sample_fraction,
-        "row_count": row_count,
-        "spark_version": spark.version,
-        "python_version": platform.python_version(),
-        "execution_mode": spark.sparkContext.master,
-        "benchmark_date_utc": datetime.now(timezone.utc).isoformat(),
+        "format": rows[0]["format"],
+        "layout": rows[0]["layout"],
+        "workload": rows[0]["workload"],
+        "measured_runs": len(runtimes),
+        "median_sec": statistics.median(runtimes),
+        "min_sec": min(runtimes),
+        "max_sec": max(runtimes),
+        "stddev_sec": statistics.stdev(runtimes) if len(runtimes) > 1 else 0.0,
     }
 
 
-def write_results(results_dir, metadata, format_results, partition_results, layout_report):
-    os.makedirs(results_dir, exist_ok=True)
+def summarize_rows(raw_rows):
+    ordered = sorted(raw_rows, key=lambda row: (row["format"], row["layout"], row["workload"]))
+    return [summary_row(list(group)) for _, group in itertools.groupby(ordered, key=lambda row: (row["format"], row["layout"], row["workload"]))]
 
-    csv_path = os.path.join(results_dir, "benchmark_results.csv")
-    with open(csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(format_results[0].keys()))
+
+def run_cells(spark, cells, config):
+    benchmark_config = config["benchmark"]
+    if benchmark_config["warmup_runs"] != 1:
+        raise ValueError("This benchmark requires benchmark.warmup_runs to be exactly 1")
+    rng = random.Random(benchmark_config["random_seed"])
+    rounds = [("warmup", 0)] + [("measured", run_number) for run_number in range(1, benchmark_config["measured_runs"] + 1)]
+    result_rows = []
+    execution_order = 0
+    for phase, run_number in rounds:
+        round_cells = list(cells)
+        rng.shuffle(round_cells)
+        for cell in round_cells:
+            spark.catalog.clearCache()
+            read_df = reader_for(spark, cell["format"], cell["path"])
+            start = time.perf_counter()
+            result = workload(read_df, cell["workload"], config).collect()
+            elapsed = time.perf_counter() - start
+            execution_order += 1
+            if phase == "measured":
+                result_rows.append(
+                    {
+                        "format": cell["format"],
+                        "layout": cell["layout"],
+                        "workload": cell["workload"],
+                        "run_number": run_number,
+                        "execution_order": execution_order,
+                        "runtime_sec": elapsed,
+                        "result_rows": len(result),
+                        "path": cell["path"],
+                        "num_data_files": cell["storage"]["num_data_files"],
+                        "output_size_bytes": cell["storage"]["output_size_bytes"],
+                    }
+                )
+    return result_rows
+
+
+def capture_formatted_plan(query_df):
+    output = io.StringIO()
+    previous_stdout = sys.stdout
+    try:
+        sys.stdout = output
+        query_df.explain("formatted")
+    finally:
+        sys.stdout = previous_stdout
+    return output.getvalue().strip()
+
+
+def plan_fields(plan_text):
+    fields = {"partition_filters": "ABSENT", "pushed_filters": "ABSENT", "read_schema": "ABSENT"}
+    labels = {"PartitionFilters": "partition_filters", "PushedFilters": "pushed_filters", "ReadSchema": "read_schema"}
+    for line in plan_text.splitlines():
+        match = re.match(r"^\s*(PartitionFilters|PushedFilters|ReadSchema):\s*(.*)$", line)
+        if match:
+            fields[labels[match.group(1)]] = match.group(2).strip() or "EMPTY"
+    return fields
+
+
+def save_plan(results_dir, name, query_df, experiment, fmt, layout, workload_name, evidence_rows):
+    plan_text = capture_formatted_plan(query_df)
+    plans_dir = os.path.join(results_dir, "plans")
+    os.makedirs(plans_dir, exist_ok=True)
+    plan_path = os.path.join(plans_dir, f"{name}.txt")
+    with open(plan_path, "w", encoding="utf-8") as handle:
+        handle.write(plan_text + "\n")
+    evidence_rows.append(
+        {
+            "experiment": experiment,
+            "format": fmt,
+            "layout": layout,
+            "workload": workload_name,
+            **plan_fields(plan_text),
+            "plan_file": os.path.relpath(plan_path, results_dir),
+        }
+    )
+
+
+def write_csv(path, rows, fieldnames):
+    with open(path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
-        writer.writerows(format_results)
-    logger.info("Wrote %s", csv_path)
-
-    json_path = os.path.join(results_dir, "benchmark_results.json")
-    with open(json_path, "w") as f:
-        json.dump({"metadata": metadata, "format_results": format_results}, f, indent=2)
-    logger.info("Wrote %s", json_path)
-
-    part_csv_path = os.path.join(results_dir, "partition_results.csv")
-    with open(part_csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(partition_results[0].keys()))
-        writer.writeheader()
-        writer.writerows(partition_results)
-    logger.info("Wrote %s", part_csv_path)
-
-    layout_path = os.path.join(results_dir, "file_layout.txt")
-    with open(layout_path, "w") as f:
-        f.write("Partition experiment file/directory layout\n")
-        f.write("=" * 50 + "\n\n")
-        f.write(layout_report + "\n")
-    logger.info("Wrote %s", layout_path)
+        writer.writerows(rows)
 
 
-# --------------------------------------------------------------------------
-# CLI + main
-# --------------------------------------------------------------------------
+def collect_metadata(spark, input_path, data_dir, config, config_source, row_count, execution_order):
+    input_size = get_dir_size_bytes(input_path) if os.path.exists(input_path) else None
+    disk = shutil.disk_usage(os.path.dirname(os.path.abspath(data_dir)))
+    return {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "dataset": {
+            "name": "usdot/flight-delays flights.csv",
+            "input_path": os.path.abspath(input_path),
+            "input_size_bytes": input_size,
+            "row_count": row_count,
+            "sample_fraction": config["benchmark"]["sample_fraction"],
+            "schema": [{"name": field.name, "type": field.dataType.simpleString()} for field in BENCHMARK_SCHEMA.fields],
+        },
+        "spark": {
+            "version": spark.version,
+            "master": spark.sparkContext.master,
+            "configured_master": config["spark"]["master"],
+            "default_parallelism": spark.sparkContext.defaultParallelism,
+            "available_system_cores": os.cpu_count(),
+            "spark.sql.shuffle.partitions": spark.conf.get("spark.sql.shuffle.partitions"),
+            "spark.sql.adaptive.enabled": spark.conf.get("spark.sql.adaptive.enabled"),
+        },
+        "python_version": platform.python_version(),
+        "platform": {"system": platform.system(), "release": platform.release(), "machine": platform.machine()},
+        "disk": {"free_bytes_at_start": disk.free, "total_bytes": disk.total},
+        "timing": {
+            "warmup_runs": config["benchmark"]["warmup_runs"],
+            "measured_runs": config["benchmark"]["measured_runs"],
+            "random_seed": config["benchmark"]["random_seed"],
+            "execution_order": execution_order,
+        },
+        "compression": config["compression"],
+        "cache_state": {
+            "benchmark_dataframes_cached": False,
+            "clear_cache_before_each_run": True,
+            "os_filesystem_cache_flushed": False,
+            "limitation": "Operating-system/filesystem caching may affect sequential runs; it is not flushed by this benchmark.",
+        },
+        "config_source": config_source,
+        "effective_configuration": config,
+    }
+
+
 def parse_args():
-    p = argparse.ArgumentParser(description="Spark storage-format & partition benchmark")
-    p.add_argument("--input", default=r"format_benchmark\spark-storage-benchmark\data\raw\flights.csv", help="Path to source CSV")
-    p.add_argument("--data-dir", default=r"format_benchmark\spark-storage-benchmark\data\generated", help="Where benchmark datasets are written")
-    p.add_argument("--results-dir", default=r"format_benchmark\spark-storage-benchmark\results", help="Where result files are written")
-    p.add_argument("--logs-dir", default=r"format_benchmark\spark-storage-benchmark\logs", help="Where the log file is written")
-    p.add_argument(
-        "--sample-fraction",
-        type=float,
-        default=1.0,
-        help="Optional fraction in (0, 1] to subsample the input for faster iteration",
-    )
-    p.add_argument(
-        "--clean-generated",
-        action="store_true",
-        help="Delete generated benchmark datasets after the run (they are git-ignored either way)",
-    )
-    return p.parse_args()
+    parser = argparse.ArgumentParser(description="Spark storage representation and layout benchmark")
+    parser.add_argument("--config", default=None, help="Optional JSON configuration path")
+    parser.add_argument("--input", default=os.path.join("data", "raw", "flights.csv"), help="Source CSV path")
+    parser.add_argument("--data-dir", default=os.path.join("data", "generated"), help="Generated datasets directory")
+    parser.add_argument("--results-dir", default="results", help="Results directory")
+    parser.add_argument("--logs-dir", default="logs", help="Logs directory")
+    parser.add_argument("--clean-generated", action="store_true", help="Remove generated datasets after the run")
+    return parser.parse_args()
 
 
 def main():
     args = parse_args()
     setup_logging(args.logs_dir)
-    logger.info("Starting Spark storage-format benchmark")
+    config, config_source = load_config(args.config)
+    sample_fraction = float(config["benchmark"]["sample_fraction"])
+    if not 0 < sample_fraction <= 1:
+        raise ValueError("benchmark.sample_fraction must be in (0, 1]")
+    os.makedirs(args.results_dir, exist_ok=True)
+    clean_dir(os.path.join(args.results_dir, "plans"))
     warn_if_windows_without_hadoop()
 
     spark = (
         SparkSession.builder.appName("SparkStorageBenchmark")
-        .master("local[2]")
-        .config("spark.sql.shuffle.partitions", "8")
+        .master(config["spark"]["master"])
+        .config("spark.sql.shuffle.partitions", str(config["spark"]["shuffle_partitions"]))
+        .config("spark.sql.adaptive.enabled", str(config["spark"]["adaptive_enabled"]).lower())
         .getOrCreate()
     )
 
     try:
-        df = load_source_data(spark, args.input, args.sample_fraction)
-        df.cache()
-        row_count = df.count()
-        logger.info("Source dataframe row count: %d", row_count)
+        source_df = load_source_data(spark, args.input, sample_fraction, config["benchmark"]["random_seed"])
+        spark.catalog.clearCache()
+        row_count = source_df.count()
+        logger.info("Source row count: %d", row_count)
+        generated_dir = args.data_dir
+        os.makedirs(generated_dir, exist_ok=True)
 
-        metadata = collect_metadata(spark, args.input, args.sample_fraction, row_count)
-        logger.info("Experiment metadata: %s", metadata)
+        representation_cells = []
+        format_write_rows = []
+        for fmt in config["representation"]["formats"]:
+            if fmt not in FORMATS:
+                raise ValueError(f"Unsupported representation format: {fmt}")
+            path = os.path.join(generated_dir, f"representation_{fmt}")
+            spark.catalog.clearCache()
+            write_time = write_dataset(source_df, path, fmt, config["compression"][fmt])
+            storage = storage_metadata(path)
+            format_write_rows.append({"format": fmt, "layout": "baseline", "write_time_sec": write_time, **storage})
+            for workload_name in config["representation"]["workloads"]:
+                if workload_name not in WORKLOADS:
+                    raise ValueError(f"Unsupported workload: {workload_name}")
+                representation_cells.append({"format": fmt, "layout": "baseline", "workload": workload_name, "path": path, "storage": storage})
 
-        format_results = run_format_benchmark(spark, df, args.data_dir)
-        partition_results, layout_report = run_partition_experiment(spark, df, args.data_dir)
+        layout_cells = []
+        layout_write_rows = []
+        layout_dir = os.path.join(generated_dir, "layout")
+        layout_specs = [
+            ("baseline", lambda df: df.repartition(int(config["layout"]["baseline_partitions"]))),
+            ("many_files_repartition", lambda df: df.repartition(int(config["layout"]["many_files_partitions"]))),
+            ("few_files_coalesce", lambda df: df.coalesce(int(config["layout"]["few_files_partitions"]))),
+        ]
+        for layout_name, transform in layout_specs:
+            path = os.path.join(layout_dir, layout_name)
+            spark.catalog.clearCache()
+            write_time = write_dataset(source_df, path, "parquet", config["compression"]["parquet"], transform=transform)
+            storage = storage_metadata(path)
+            layout_write_rows.append({"format": "parquet", "layout": layout_name, "write_time_sec": write_time, **storage})
+            layout_cells.append({"format": "parquet", "layout": layout_name, "workload": "W1", "path": path, "storage": storage})
 
-        write_results(args.results_dir, metadata, format_results, partition_results, layout_report)
+        partitioned_path = os.path.join(generated_dir, "partitioned_parquet_year_month")
+        spark.catalog.clearCache()
+        partitioned_write_time = write_dataset(source_df, partitioned_path, "parquet", config["compression"]["parquet"], partition_by=PARTITION_COLS)
+        partitioned_storage = storage_metadata(partitioned_path)
 
-        if args.clean_generated:
-            logger.info("Cleaning up generated datasets in %s", args.data_dir)
-            clean_dir(args.data_dir)
+        representation_raw = run_cells(spark, representation_cells, config)
+        layout_raw = run_cells(spark, layout_cells, config)
+        representation_summary = summarize_rows(representation_raw)
+        layout_summary = summarize_rows(layout_raw)
 
-        logger.info("Benchmark finished successfully.")
+        evidence_rows = []
+        partitioned_df = reader_for(spark, "parquet", partitioned_path)
+        spark.catalog.clearCache()
+        pruning_start = time.perf_counter()
+        pruning_result = workload(partitioned_df, "W2", config).collect()
+        pruning_runtime = time.perf_counter() - pruning_start
+        save_plan(args.results_dir, "partition_pruning_w2", workload(partitioned_df, "W2", config), "partition_pruning", "parquet", "partitioned_year_month", "W2", evidence_rows)
+        parquet_df = reader_for(spark, "parquet", os.path.join(generated_dir, "representation_parquet"))
+        threshold = config["workloads"]["W2_pushdown"]["arrival_delay_gt"]
+        pushdown_query = parquet_df.filter(F.col(ARRIVAL_DELAY_COL) > threshold).select(ARRIVAL_DELAY_COL).agg(F.count(F.lit(1)))
+        save_plan(args.results_dir, "predicate_pushdown_arrival_delay", pushdown_query, "predicate_pushdown", "parquet", "baseline", "W2_pushdown", evidence_rows)
+        save_plan(args.results_dir, "column_pruning_w3", workload(parquet_df, "W3", config), "column_pruning", "parquet", "baseline", "W3", evidence_rows)
+
+        raw_fields = ["format", "layout", "workload", "run_number", "execution_order", "runtime_sec", "result_rows", "path", "num_data_files", "output_size_bytes"]
+        write_csv(os.path.join(args.results_dir, "representation_raw.csv"), representation_raw, raw_fields)
+        write_csv(os.path.join(args.results_dir, "representation_summary.csv"), representation_summary, list(representation_summary[0].keys()))
+        write_csv(os.path.join(args.results_dir, "layout_raw.csv"), layout_raw, raw_fields)
+        write_csv(os.path.join(args.results_dir, "layout_summary.csv"), layout_summary, list(layout_summary[0].keys()))
+        write_csv(os.path.join(args.results_dir, "plan_evidence.csv"), evidence_rows, ["experiment", "format", "layout", "workload", "partition_filters", "pushed_filters", "read_schema", "plan_file"])
+
+        execution_order = {
+            "representation_raw": [{key: row[key] for key in ("format", "layout", "workload", "run_number", "execution_order")} for row in representation_raw],
+            "layout_raw": [{key: row[key] for key in ("format", "layout", "workload", "run_number", "execution_order")} for row in layout_raw],
+        }
+        metadata = collect_metadata(spark, args.input, generated_dir, config, config_source, row_count, execution_order)
+        metadata["generated_datasets"] = {
+            "representation": format_write_rows,
+            "layout": layout_write_rows,
+            "partitioned_parquet": {"write_time_sec": partitioned_write_time, **partitioned_storage},
+        }
+        metadata["partition_pruning_probe"] = {
+            "workload": "W2",
+            "year": config["workloads"]["W2"]["year"],
+            "month": config["workloads"]["W2"]["month"],
+            "runtime_sec": pruning_runtime,
+            "result_rows": len(pruning_result),
+        }
+        with open(os.path.join(args.results_dir, "benchmark_metadata.json"), "w", encoding="utf-8") as handle:
+            json.dump(metadata, handle, indent=2)
+        logger.info("Benchmark finished successfully. Results written to %s", args.results_dir)
     finally:
         spark.stop()
+        if args.clean_generated:
+            clean_dir(args.data_dir)
 
 
 if __name__ == "__main__":
