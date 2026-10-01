@@ -1,7 +1,7 @@
 # Spark Storage Benchmark
 
 This project measures how storage representation, output layout, and query
-shape affect Spark reads for the Kaggle `usdot/flight-delays` `flights.csv`
+shape affect Spark reads for the Kaggle `usdot/flight-delays` `flights.csv`(https://www.kaggle.com/datasets/usdot/flight-delays)
 dataset. The primary implementation is [format_benchmark.py](format_benchmark.py).
 
 ## Run
