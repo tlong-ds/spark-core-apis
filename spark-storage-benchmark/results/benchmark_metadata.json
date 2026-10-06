@@ -1,0 +1,741 @@
+{
+  "timestamp_utc": "2026-10-01T09:21:04.783869+00:00",
+  "dataset": {
+    "name": "usdot/flight-delays flights.csv",
+    "input_path": "D:\\NEU\\Semester 7\\Big data\\spark-core-apis\\spark-storage-benchmark\\data\\raw\\flights.csv",
+    "input_size_bytes": 592406591,
+    "row_count": 5819079,
+    "sample_fraction": 1.0,
+    "schema": [
+      {
+        "name": "AIRLINE",
+        "type": "string"
+      },
+      {
+        "name": "ARRIVAL_DELAY",
+        "type": "double"
+      },
+      {
+        "name": "DEPARTURE_DELAY",
+        "type": "double"
+      },
+      {
+        "name": "DISTANCE",
+        "type": "double"
+      },
+      {
+        "name": "YEAR",
+        "type": "int"
+      },
+      {
+        "name": "MONTH",
+        "type": "int"
+      }
+    ]
+  },
+  "spark": {
+    "version": "3.5.9",
+    "master": "local[2]",
+    "configured_master": "local[2]",
+    "default_parallelism": 2,
+    "available_system_cores": 12,
+    "spark.sql.shuffle.partitions": "8",
+    "spark.sql.adaptive.enabled": "true"
+  },
+  "python_version": "3.11.7",
+  "platform": {
+    "system": "Windows",
+    "release": "10",
+    "machine": "AMD64"
+  },
+  "disk": {
+    "free_bytes_at_start": 284258258944,
+    "total_bytes": 380632035328
+  },
+  "timing": {
+    "warmup_runs": 1,
+    "measured_runs": 5,
+    "random_seed": 42,
+    "execution_order": {
+      "representation_raw": [
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 1,
+          "execution_order": 13
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 1,
+          "execution_order": 14
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 1,
+          "execution_order": 15
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 1,
+          "execution_order": 16
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 1,
+          "execution_order": 17
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 1,
+          "execution_order": 18
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 1,
+          "execution_order": 19
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 1,
+          "execution_order": 20
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 1,
+          "execution_order": 21
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 1,
+          "execution_order": 22
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 1,
+          "execution_order": 23
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 1,
+          "execution_order": 24
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 2,
+          "execution_order": 25
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 2,
+          "execution_order": 26
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 2,
+          "execution_order": 27
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 2,
+          "execution_order": 28
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 2,
+          "execution_order": 29
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 2,
+          "execution_order": 30
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 2,
+          "execution_order": 31
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 2,
+          "execution_order": 32
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 2,
+          "execution_order": 33
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 2,
+          "execution_order": 34
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 2,
+          "execution_order": 35
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 2,
+          "execution_order": 36
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 3,
+          "execution_order": 37
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 3,
+          "execution_order": 38
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 3,
+          "execution_order": 39
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 3,
+          "execution_order": 40
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 3,
+          "execution_order": 41
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 3,
+          "execution_order": 42
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 3,
+          "execution_order": 43
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 3,
+          "execution_order": 44
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 3,
+          "execution_order": 45
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 3,
+          "execution_order": 46
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 3,
+          "execution_order": 47
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 3,
+          "execution_order": 48
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 4,
+          "execution_order": 49
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 4,
+          "execution_order": 50
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 4,
+          "execution_order": 51
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 4,
+          "execution_order": 52
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 4,
+          "execution_order": 53
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 4,
+          "execution_order": 54
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 4,
+          "execution_order": 55
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 4,
+          "execution_order": 56
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 4,
+          "execution_order": 57
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 4,
+          "execution_order": 58
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 4,
+          "execution_order": 59
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 4,
+          "execution_order": 60
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 5,
+          "execution_order": 61
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 5,
+          "execution_order": 62
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 5,
+          "execution_order": 63
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 5,
+          "execution_order": 64
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 5,
+          "execution_order": 65
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 5,
+          "execution_order": 66
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 5,
+          "execution_order": 67
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 5,
+          "execution_order": 68
+        },
+        {
+          "format": "json",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 5,
+          "execution_order": 69
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 5,
+          "execution_order": 70
+        },
+        {
+          "format": "csv",
+          "layout": "baseline",
+          "workload": "W2",
+          "run_number": 5,
+          "execution_order": 71
+        },
+        {
+          "format": "orc",
+          "layout": "baseline",
+          "workload": "W3",
+          "run_number": 5,
+          "execution_order": 72
+        }
+      ],
+      "layout_raw": [
+        {
+          "format": "parquet",
+          "layout": "few_files_coalesce",
+          "workload": "W1",
+          "run_number": 1,
+          "execution_order": 4
+        },
+        {
+          "format": "parquet",
+          "layout": "many_files_repartition",
+          "workload": "W1",
+          "run_number": 1,
+          "execution_order": 5
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 1,
+          "execution_order": 6
+        },
+        {
+          "format": "parquet",
+          "layout": "many_files_repartition",
+          "workload": "W1",
+          "run_number": 2,
+          "execution_order": 7
+        },
+        {
+          "format": "parquet",
+          "layout": "few_files_coalesce",
+          "workload": "W1",
+          "run_number": 2,
+          "execution_order": 8
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 2,
+          "execution_order": 9
+        },
+        {
+          "format": "parquet",
+          "layout": "many_files_repartition",
+          "workload": "W1",
+          "run_number": 3,
+          "execution_order": 10
+        },
+        {
+          "format": "parquet",
+          "layout": "few_files_coalesce",
+          "workload": "W1",
+          "run_number": 3,
+          "execution_order": 11
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 3,
+          "execution_order": 12
+        },
+        {
+          "format": "parquet",
+          "layout": "many_files_repartition",
+          "workload": "W1",
+          "run_number": 4,
+          "execution_order": 13
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 4,
+          "execution_order": 14
+        },
+        {
+          "format": "parquet",
+          "layout": "few_files_coalesce",
+          "workload": "W1",
+          "run_number": 4,
+          "execution_order": 15
+        },
+        {
+          "format": "parquet",
+          "layout": "baseline",
+          "workload": "W1",
+          "run_number": 5,
+          "execution_order": 16
+        },
+        {
+          "format": "parquet",
+          "layout": "many_files_repartition",
+          "workload": "W1",
+          "run_number": 5,
+          "execution_order": 17
+        },
+        {
+          "format": "parquet",
+          "layout": "few_files_coalesce",
+          "workload": "W1",
+          "run_number": 5,
+          "execution_order": 18
+        }
+      ]
+    }
+  },
+  "compression": {
+    "csv": "none",
+    "json": "none",
+    "parquet": "snappy",
+    "orc": "zlib"
+  },
+  "cache_state": {
+    "benchmark_dataframes_cached": false,
+    "clear_cache_before_each_run": true,
+    "os_filesystem_cache_flushed": false,
+    "limitation": "Operating-system/filesystem caching may affect sequential runs; it is not flushed by this benchmark."
+  },
+  "config_source": "python_defaults",
+  "effective_configuration": {
+    "benchmark": {
+      "warmup_runs": 1,
+      "measured_runs": 5,
+      "random_seed": 42,
+      "sample_fraction": 1.0
+    },
+    "spark": {
+      "master": "local[2]",
+      "shuffle_partitions": 8,
+      "adaptive_enabled": true
+    },
+    "compression": {
+      "csv": "none",
+      "json": "none",
+      "parquet": "snappy",
+      "orc": "zlib"
+    },
+    "representation": {
+      "formats": [
+        "csv",
+        "json",
+        "parquet",
+        "orc"
+      ],
+      "workloads": [
+        "W1",
+        "W2",
+        "W3"
+      ]
+    },
+    "layout": {
+      "baseline_partitions": 4,
+      "many_files_partitions": 20,
+      "few_files_partitions": 2
+    },
+    "workloads": {
+      "W2": {
+        "year": 2015,
+        "month": 1
+      },
+      "W2_pushdown": {
+        "arrival_delay_gt": 60
+      }
+    }
+  },
+  "generated_datasets": {
+    "representation": [
+      {
+        "format": "csv",
+        "layout": "baseline",
+        "write_time_sec": 7.530915100011043,
+        "output_size_bytes": 159958207,
+        "num_data_files": 5,
+        "min_file_size_bytes": 15322459,
+        "median_file_size_bytes": 36066079,
+        "max_file_size_bytes": 36413001
+      },
+      {
+        "format": "json",
+        "layout": "baseline",
+        "write_time_sec": 11.640785700059496,
+        "output_size_bytes": 581327565,
+        "num_data_files": 5,
+        "min_file_size_bytes": 54577978,
+        "median_file_size_bytes": 131586861,
+        "max_file_size_bytes": 132275901
+      },
+      {
+        "format": "parquet",
+        "layout": "baseline",
+        "write_time_sec": 7.355406599934213,
+        "output_size_bytes": 24930817,
+        "num_data_files": 5,
+        "min_file_size_bytes": 2296010,
+        "median_file_size_bytes": 5676748,
+        "max_file_size_bytes": 5723435
+      },
+      {
+        "format": "orc",
+        "layout": "baseline",
+        "write_time_sec": 7.0100175000261515,
+        "output_size_bytes": 32840782,
+        "num_data_files": 5,
+        "min_file_size_bytes": 3080747,
+        "median_file_size_bytes": 7493790,
+        "max_file_size_bytes": 7553345
+      }
+    ],
+    "layout": [
+      {
+        "format": "parquet",
+        "layout": "baseline",
+        "write_time_sec": 10.388003699947149,
+        "output_size_bytes": 27820410,
+        "num_data_files": 4,
+        "min_file_size_bytes": 6952042,
+        "median_file_size_bytes": 6955150.5,
+        "max_file_size_bytes": 6958067
+      },
+      {
+        "format": "parquet",
+        "layout": "many_files_repartition",
+        "write_time_sec": 11.108072499977425,
+        "output_size_bytes": 27680682,
+        "num_data_files": 20,
+        "min_file_size_bytes": 1378570,
+        "median_file_size_bytes": 1384433.0,
+        "max_file_size_bytes": 1389921
+      },
+      {
+        "format": "parquet",
+        "layout": "few_files_coalesce",
+        "write_time_sec": 6.62564400001429,
+        "output_size_bytes": 25164456,
+        "num_data_files": 2,
+        "min_file_size_bytes": 11501346,
+        "median_file_size_bytes": 12582228.0,
+        "max_file_size_bytes": 13663110
+      }
+    ],
+    "partitioned_parquet": {
+      "write_time_sec": 6.550738300080411,
+      "output_size_bytes": 24691849,
+      "num_data_files": 16,
+      "min_file_size_bytes": 241342,
+      "median_file_size_bytes": 1848280.5,
+      "max_file_size_bytes": 2208578
+    }
+  },
+  "partition_pruning_probe": {
+    "workload": "W2",
+    "year": 2015,
+    "month": 1,
+    "runtime_sec": 0.5927011999301612,
+    "result_rows": 14
+  }
+}

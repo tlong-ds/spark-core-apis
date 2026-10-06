@@ -1,0 +1,35 @@
+== Physical Plan ==
+AdaptiveSparkPlan (5)
++- SortAggregate (4)
+   +- Exchange (3)
+      +- SortAggregate (2)
+         +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [2]: [AIRLINE#5455, ARRIVAL_DELAY#5456]
+Batched: true
+Location: InMemoryFileIndex [file:/D:/NEU/Semester 7/Big data/spark-core-apis/spark-storage-benchmark/data/generated/representation_parquet]
+ReadSchema: struct<AIRLINE:string,ARRIVAL_DELAY:double>
+
+(2) SortAggregate
+Input [2]: [AIRLINE#5455, ARRIVAL_DELAY#5456]
+Keys: []
+Functions [4]: [partial_count(1), partial_min(AIRLINE#5455), partial_max(AIRLINE#5455), partial_avg(ARRIVAL_DELAY#5456)]
+Aggregate Attributes [5]: [count#5491L, min#5492, max#5493, sum#5494, count#5495L]
+Results [5]: [count#5496L, min#5497, max#5498, sum#5499, count#5500L]
+
+(3) Exchange
+Input [5]: [count#5496L, min#5497, max#5498, sum#5499, count#5500L]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=3924]
+
+(4) SortAggregate
+Input [5]: [count#5496L, min#5497, max#5498, sum#5499, count#5500L]
+Keys: []
+Functions [4]: [count(1), min(AIRLINE#5455), max(AIRLINE#5455), avg(ARRIVAL_DELAY#5456)]
+Aggregate Attributes [4]: [count(1)#5477L, min(AIRLINE#5455)#5479, max(AIRLINE#5455)#5481, avg(ARRIVAL_DELAY#5456)#5483]
+Results [4]: [count(1)#5477L AS row_count#5478L, min(AIRLINE#5455)#5479 AS min_carrier#5480, max(AIRLINE#5455)#5481 AS max_carrier#5482, avg(ARRIVAL_DELAY#5456)#5483 AS avg_arrival_delay#5484]
+
+(5) AdaptiveSparkPlan
+Output [4]: [row_count#5478L, min_carrier#5480, max_carrier#5482, avg_arrival_delay#5484]
+Arguments: isFinalPlan=false

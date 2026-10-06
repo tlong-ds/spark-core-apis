@@ -1,0 +1,46 @@
+== Physical Plan ==
+AdaptiveSparkPlan (7)
++- HashAggregate (6)
+   +- Exchange (5)
+      +- HashAggregate (4)
+         +- Project (3)
+            +- Filter (2)
+               +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [1]: [ARRIVAL_DELAY#5456]
+Batched: true
+Location: InMemoryFileIndex [file:/D:/NEU/Semester 7/Big data/spark-core-apis/spark-storage-benchmark/data/generated/representation_parquet]
+PushedFilters: [IsNotNull(ARRIVAL_DELAY), GreaterThan(ARRIVAL_DELAY,60.0)]
+ReadSchema: struct<ARRIVAL_DELAY:double>
+
+(2) Filter
+Input [1]: [ARRIVAL_DELAY#5456]
+Condition : (isnotnull(ARRIVAL_DELAY#5456) AND (ARRIVAL_DELAY#5456 > 60.0))
+
+(3) Project
+Output: []
+Input [1]: [ARRIVAL_DELAY#5456]
+
+(4) HashAggregate
+Input: []
+Keys: []
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#5473L]
+Results [1]: [count#5474L]
+
+(5) Exchange
+Input [1]: [count#5474L]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=3911]
+
+(6) HashAggregate
+Input [1]: [count#5474L]
+Keys: []
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#5469L]
+Results [1]: [count(1)#5469L AS count(1)#5471L]
+
+(7) AdaptiveSparkPlan
+Output [1]: [count(1)#5471L]
+Arguments: isFinalPlan=false

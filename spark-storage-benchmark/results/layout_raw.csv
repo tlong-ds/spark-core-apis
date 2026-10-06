@@ -1,0 +1,16 @@
+format,layout,workload,run_number,execution_order,runtime_sec,result_rows,path,num_data_files,output_size_bytes
+parquet,few_files_coalesce,W1,1,4,0.7582916999235749,14,data\generated\layout\few_files_coalesce,2,25164456
+parquet,many_files_repartition,W1,1,5,0.525026399991475,14,data\generated\layout\many_files_repartition,20,27680682
+parquet,baseline,W1,1,6,0.565676899976097,14,data\generated\layout\baseline,4,27820410
+parquet,many_files_repartition,W1,2,7,0.7222575999330729,14,data\generated\layout\many_files_repartition,20,27680682
+parquet,few_files_coalesce,W1,2,8,0.5298056999454275,14,data\generated\layout\few_files_coalesce,2,25164456
+parquet,baseline,W1,2,9,0.5130796000594273,14,data\generated\layout\baseline,4,27820410
+parquet,many_files_repartition,W1,3,10,0.761695499997586,14,data\generated\layout\many_files_repartition,20,27680682
+parquet,few_files_coalesce,W1,3,11,0.44154570007231086,14,data\generated\layout\few_files_coalesce,2,25164456
+parquet,baseline,W1,3,12,0.4767238999484107,14,data\generated\layout\baseline,4,27820410
+parquet,many_files_repartition,W1,4,13,0.6262005999451503,14,data\generated\layout\many_files_repartition,20,27680682
+parquet,baseline,W1,4,14,0.6686679000267759,14,data\generated\layout\baseline,4,27820410
+parquet,few_files_coalesce,W1,4,15,0.8216437000082806,14,data\generated\layout\few_files_coalesce,2,25164456
+parquet,baseline,W1,5,16,1.1702156000537798,14,data\generated\layout\baseline,4,27820410
+parquet,many_files_repartition,W1,5,17,0.9217016999609768,14,data\generated\layout\many_files_repartition,20,27680682
+parquet,few_files_coalesce,W1,5,18,0.796010399935767,14,data\generated\layout\few_files_coalesce,2,25164456

@@ -1,0 +1,41 @@
+== Physical Plan ==
+AdaptiveSparkPlan (6)
++- HashAggregate (5)
+   +- Exchange (4)
+      +- HashAggregate (3)
+         +- Project (2)
+            +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [6]: [AIRLINE#5360, ARRIVAL_DELAY#5361, DEPARTURE_DELAY#5362, DISTANCE#5363, YEAR#5364, MONTH#5365]
+Batched: true
+Location: InMemoryFileIndex [file:/D:/NEU/Semester 7/Big data/spark-core-apis/spark-storage-benchmark/data/generated/partitioned_parquet_year_month]
+PartitionFilters: [isnotnull(YEAR#5364), isnotnull(MONTH#5365), (YEAR#5364 = 2015), (MONTH#5365 = 1)]
+ReadSchema: struct<AIRLINE:string,ARRIVAL_DELAY:double,DEPARTURE_DELAY:double,DISTANCE:double>
+
+(2) Project
+Output [4]: [AIRLINE#5360, ARRIVAL_DELAY#5361, DEPARTURE_DELAY#5362, DISTANCE#5363]
+Input [6]: [AIRLINE#5360, ARRIVAL_DELAY#5361, DEPARTURE_DELAY#5362, DISTANCE#5363, YEAR#5364, MONTH#5365]
+
+(3) HashAggregate
+Input [4]: [AIRLINE#5360, ARRIVAL_DELAY#5361, DEPARTURE_DELAY#5362, DISTANCE#5363]
+Keys [1]: [AIRLINE#5360]
+Functions [4]: [partial_avg(ARRIVAL_DELAY#5361), partial_avg(DEPARTURE_DELAY#5362), partial_avg(DISTANCE#5363), partial_count(1)]
+Aggregate Attributes [7]: [sum#5441, count#5442L, sum#5443, count#5444L, sum#5445, count#5446L, count#5447L]
+Results [8]: [AIRLINE#5360, sum#5448, count#5449L, sum#5450, count#5451L, sum#5452, count#5453L, count#5454L]
+
+(4) Exchange
+Input [8]: [AIRLINE#5360, sum#5448, count#5449L, sum#5450, count#5451L, sum#5452, count#5453L, count#5454L]
+Arguments: hashpartitioning(AIRLINE#5360, 8), ENSURE_REQUIREMENTS, [plan_id=3894]
+
+(5) HashAggregate
+Input [8]: [AIRLINE#5360, sum#5448, count#5449L, sum#5450, count#5451L, sum#5452, count#5453L, count#5454L]
+Keys [1]: [AIRLINE#5360]
+Functions [4]: [avg(ARRIVAL_DELAY#5361), avg(DEPARTURE_DELAY#5362), avg(DISTANCE#5363), count(1)]
+Aggregate Attributes [4]: [avg(ARRIVAL_DELAY#5361)#5428, avg(DEPARTURE_DELAY#5362)#5430, avg(DISTANCE#5363)#5432, count(1)#5434L]
+Results [5]: [AIRLINE#5360, avg(ARRIVAL_DELAY#5361)#5428 AS avg_arrival_delay#5429, avg(DEPARTURE_DELAY#5362)#5430 AS avg_departure_delay#5431, avg(DISTANCE#5363)#5432 AS avg_distance#5433, count(1)#5434L AS row_count#5435L]
+
+(6) AdaptiveSparkPlan
+Output [5]: [AIRLINE#5360, avg_arrival_delay#5429, avg_departure_delay#5431, avg_distance#5433, row_count#5435L]
+Arguments: isFinalPlan=false

@@ -1,0 +1,4 @@
+experiment,format,layout,workload,partition_filters,pushed_filters,read_schema,plan_file
+partition_pruning,parquet,partitioned_year_month,W2,"[isnotnull(YEAR#5364), isnotnull(MONTH#5365), (YEAR#5364 = 2015), (MONTH#5365 = 1)]",ABSENT,"struct<AIRLINE:string,ARRIVAL_DELAY:double,DEPARTURE_DELAY:double,DISTANCE:double>",plans\partition_pruning_w2.txt
+predicate_pushdown,parquet,baseline,W2_pushdown,ABSENT,"[IsNotNull(ARRIVAL_DELAY), GreaterThan(ARRIVAL_DELAY,60.0)]",struct<ARRIVAL_DELAY:double>,plans\predicate_pushdown_arrival_delay.txt
+column_pruning,parquet,baseline,W3,ABSENT,ABSENT,"struct<AIRLINE:string,ARRIVAL_DELAY:double>",plans\column_pruning_w3.txt
