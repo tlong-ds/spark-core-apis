@@ -1,7 +1,43 @@
 import re
 import csv
 import ipaddress
-LOG_REGEX = re.compile(r'^(\S+) - - \[.*?\] "\S+ \S+ \S+" (\d{3})')
+from dataclasses import dataclass
+
+
+# A full-record contract is deliberately stricter than the old Task-1 regex.
+# Every implementation must classify input according to this exact contract.
+LOG_REGEX = re.compile(
+    r'^(?P<ip>\S+) - - \[(?P<timestamp>[^\]]+)\] '
+    r'"(?P<method>\S+) (?P<url>\S+) HTTP/(?P<protocol>\S+)" '
+    r'(?P<status>\d{3}) (?P<response_bytes>\d+) (?P<latency_ms>\d+)ms$'
+)
+# Spark's Java regex engine does not support Python's ``(?P<name>...)`` groups.
+SPARK_LOG_PATTERN = (
+    r'^(\S+) - - \[([^\]]+)\] "(\S+) (\S+) HTTP/(\S+)" '
+    r'(\d{3}) (\d+) (\d+)ms$'
+)
+
+
+@dataclass(frozen=True)
+class ParsedLog:
+    """Shared parser result used by the RDD and Hybrid paths."""
+
+    state: str
+    reason: str | None
+    raw: str
+    ip: str | None = None
+    http_status: int | None = None
+
+
+def parse_log_entry(entry: str) -> ParsedLog:
+    """Parse one already-expanded entry without silently discarding failures."""
+    raw = entry.strip()
+    match = LOG_REGEX.match(raw)
+    if not match:
+        return ParsedLog("malformed", "invalid_format", raw)
+    return ParsedLog(
+        "valid", None, raw, match.group("ip"), int(match.group("status"))
+    )
 
 
 
@@ -29,32 +65,19 @@ def resolve_ip(ip_str: str, ip_country_map: dict) -> str:
 
 
 def create_comparison_df(spark, rdd_metrics: dict, df_metrics: dict, hybrid_metrics: dict = None):
-    """Build a structured Spark DataFrame for the quantitative comparison matrix."""
-    parity_rdd_df = "PASS (100% Match)" if rdd_metrics["results"] == df_metrics["results"] else "FAIL (Mismatch)"
+    """Build an exportable comparison matrix from the semantic result contract.
 
-    if hybrid_metrics:
-        parity_hybrid = "PASS (100% Match)" if rdd_metrics["results"] == hybrid_metrics["results"] else "FAIL (Mismatch)"
-        speedup_df = df_metrics["time"] / rdd_metrics["time"] if rdd_metrics["time"] > 0 else 1.0
-        speedup_hybrid = rdd_metrics["time"] / hybrid_metrics["time"] if hybrid_metrics["time"] > 0 else 1.0
-
-        rows = [
-            ("Execution Latency", f"{rdd_metrics['time']:.2f}s", f"{df_metrics['time']:.2f}s", f"{hybrid_metrics['time']:.2f}s ({speedup_hybrid:.2f}x faster)"),
-            ("Spark Actions / Jobs Triggered", str(rdd_metrics["actions"]), str(df_metrics["actions"]), str(hybrid_metrics["actions"])),
-            ("Storage File Scan Passes", str(rdd_metrics["scans"]), str(df_metrics["scans"]), str(hybrid_metrics["scans"])),
-            ("CIDR Geolocation Operator", rdd_metrics["operator"], df_metrics["operator"], hybrid_metrics["operator"]),
-            ("Corrupt Lines Audited", f"{rdd_metrics['corrupt']:,d}", f"{df_metrics['corrupt']:,d}", f"{hybrid_metrics['corrupt']:,d}"),
-            ("Top-10 Checksum Parity", parity_rdd_df, parity_rdd_df, parity_hybrid),
-        ]
-        return spark.createDataFrame(rows, ["metric", "low_level_rdd", "high_level_dataframe", "hybrid_rdd_dataframe"])
-
-    speedup = df_metrics["time"] / rdd_metrics["time"] if rdd_metrics["time"] > 0 else 1.0
-    rows = [
-        ("Execution Latency", f"{rdd_metrics['time']:.2f}s", f"{df_metrics['time']:.2f}s ({speedup:.2f}x)"),
-        ("Spark Actions / Jobs Triggered", str(rdd_metrics["actions"]), str(df_metrics["actions"])),
-        ("Storage File Scan Passes", str(rdd_metrics["scans"]), str(df_metrics["scans"])),
-        ("CIDR Geolocation Operator", rdd_metrics["operator"], df_metrics["operator"]),
-        ("Corrupt Lines Audited", f"{rdd_metrics['corrupt']:,d}", f"{df_metrics['corrupt']:,d}"),
-        ("Top-10 Checksum Parity", parity_rdd_df, parity_rdd_df),
-    ]
-    return spark.createDataFrame(rows, ["metric", "low_level_rdd", "high_level_dataframe"])
-
+    Accumulator values are intentionally not included: they are telemetry and
+    may over-count after task retries or recomputation.
+    """
+    metrics = [("Execution latency", lambda item: f"{item['time']:.2f}s"),
+               ("Semantic counts", lambda item: str(item["semantic_counts"])),
+               ("Top-10 parity", lambda item: "PASS" if item["results"] == rdd_metrics["results"] else "FAIL"),
+               ("Spark actions", lambda item: str(len(item["execution_trace"]))),
+               ("CIDR operator", lambda item: item["operator"])]
+    result_sets = [("low_level_rdd", rdd_metrics), ("high_level_dataframe", df_metrics)]
+    if hybrid_metrics is not None:
+        result_sets.append(("hybrid_rdd_dataframe", hybrid_metrics))
+    columns = ["metric"] + [name for name, _ in result_sets]
+    rows = [(metric,) + tuple(render(result) for _, result in result_sets) for metric, render in metrics]
+    return spark.createDataFrame(rows, columns)

@@ -5,7 +5,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Activate the Python virtual environment before invoking this script.
+# Prefer the project's virtualenv, while allowing an explicit interpreter for
+# Windows, CI, or managed Spark environments.
+if [[ -z "${PYSPARK_PYTHON:-}" ]]; then
+  for candidate in "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/.venv/Scripts/python.exe"; do
+    if [[ -x "$candidate" ]]; then
+      export PYSPARK_PYTHON="$candidate"
+      break
+    fi
+  done
+fi
 export PYSPARK_PYTHON="${PYSPARK_PYTHON:-python}"
 export PYSPARK_DRIVER_PYTHON="${PYSPARK_DRIVER_PYTHON:-$PYSPARK_PYTHON}"
 

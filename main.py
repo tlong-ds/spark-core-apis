@@ -3,7 +3,6 @@
 import argparse
 import json
 import os
-import posixpath
 import sys
 import time
 from pathlib import Path
@@ -21,7 +20,7 @@ from pyspark.sql import functions as F
 
 import format_benchmark as benchmark
 from helper import load_ip_country_map
-from rdd_processing import execute_rdd_job
+from rdd_processing import execute_rdd_job, write_result_output
 
 
 def parse_args():
@@ -64,10 +63,6 @@ def parse_args():
         help="Wait for Enter after both tasks, so the Spark UI stays available",
     )
     return parser.parse_args()
-
-
-def join_output_path(base_path, child_name):
-    return posixpath.join(base_path.rstrip("/"), child_name)
 
 
 def run_updated_task2(spark, args):
@@ -395,13 +390,20 @@ def main():
         metrics = execute_rdd_job(
             spark.sparkContext, spark, args.input_path, ip_country_map
         )
-        output_path = join_output_path(args.output_path, "country_counts")
-        metrics["df"].coalesce(1).write.mode("overwrite").csv(
-            output_path, header=True
+        write_result_output(
+            spark.sparkContext,
+            spark,
+            args.output_path,
+            "rdd",
+            args.input_path,
+            ip_country_map,
         )
-        print(f"-> Aggregated country counts saved to: {output_path}")
         print(f"-> Execution Latency : {metrics['time']:.2f}s")
-        print(f"-> Corrupt Log Lines  : {metrics['corrupt']:,d}")
+        print(f"-> Semantic Counts    : {metrics['semantic_counts']}")
+        print(
+            "-> Accumulator Telemetry (not correctness): "
+            f"{metrics['telemetry_invalid_accumulator']:,d}"
+        )
 
         print("\n" + "=" * 70)
         print(" [TASK 2] FORMAT, LAYOUT & QUERY BENCHMARK (W1/W2/W3)")
