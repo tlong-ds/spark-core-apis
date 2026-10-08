@@ -20,6 +20,7 @@ if ! command -v "$SPARK_BIN" >/dev/null 2>&1; then
   exit 1
 fi
 
+# Forward optional --task all|task1|task2 and other main.py flags via "$@".
 "$SPARK_BIN" \
   --master "${SPARK_MASTER:-local[*]}" \
   --name "${SPARK_APP_NAME:-LowLevel_FileFormat_Job}" \

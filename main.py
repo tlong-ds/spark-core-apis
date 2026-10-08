@@ -28,6 +28,12 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Task 3: run logistics RDD processing and the updated file benchmark"
     )
+    parser.add_argument(
+        "--task",
+        choices=("all", "task1", "task2"),
+        default="all",
+        help="Run both tasks (default), only Task 1, or only Task 2",
+    )
     parser.add_argument("--input-path", default="./data/raw_logs.txt")
     parser.add_argument("--lookup-path", default="./data/ip_geolocation.csv")
     parser.add_argument("--output-path", default="./data/output")
@@ -61,7 +67,7 @@ def parse_args():
     parser.add_argument(
         "--interactive",
         action="store_true",
-        help="Wait for Enter after both tasks, so the Spark UI stays available",
+        help="Wait for Enter after the selected task(s), so the Spark UI stays available",
     )
     return parser.parse_args()
 
@@ -370,12 +376,18 @@ def run_updated_task2(spark, args):
 
 def main():
     args = parse_args()
-    for label, path in (
-        ("Task 1 raw logs", args.input_path),
-        ("Task 1 lookup", args.lookup_path),
-        ("Task 2 flights.csv", args.format_input),
-        ("Task 2 config", args.format_config),
-    ):
+    required_files = []
+    if args.task in ("all", "task1"):
+        required_files.extend(
+            (("Task 1 raw logs", args.input_path),
+             ("Task 1 lookup", args.lookup_path))
+        )
+    if args.task in ("all", "task2"):
+        required_files.extend(
+            (("Task 2 flights.csv", args.format_input),
+             ("Task 2 config", args.format_config))
+        )
+    for label, path in required_files:
         if not os.path.isfile(path):
             raise FileNotFoundError(f"{label} is missing: {path}")
 
@@ -388,26 +400,39 @@ def main():
     )
     spark.sparkContext.setLogLevel("WARN")
     try:
-        print("\n" + "=" * 70)
-        print(" [TASK 1] PROCESSING LOGS (RDD + BROADCAST CIDR + ACCUMULATOR)")
-        print("=" * 70)
-        ip_country_map = load_ip_country_map(args.lookup_path)
-        metrics = execute_rdd_job(
-            spark.sparkContext, spark, args.input_path, ip_country_map
-        )
-        output_path = join_output_path(args.output_path, "country_counts")
-        metrics["df"].coalesce(1).write.mode("overwrite").csv(
-            output_path, header=True
-        )
-        print(f"-> Aggregated country counts saved to: {output_path}")
-        print(f"-> Execution Latency : {metrics['time']:.2f}s")
-        print(f"-> Corrupt Log Lines  : {metrics['corrupt']:,d}")
+        task_times = {}
+        if args.task in ("all", "task1"):
+            task_start = time.perf_counter()
+            print("\n" + "=" * 70)
+            print(" [TASK 1] PROCESSING LOGS (RDD + BROADCAST CIDR + ACCUMULATOR)")
+            print("=" * 70)
+            ip_country_map = load_ip_country_map(args.lookup_path)
+            metrics = execute_rdd_job(
+                spark.sparkContext, spark, args.input_path, ip_country_map
+            )
+            output_path = join_output_path(args.output_path, "country_counts")
+            metrics["df"].coalesce(1).write.mode("overwrite").csv(
+                output_path, header=True
+            )
+            task_times["Task 1"] = time.perf_counter() - task_start
+            print(f"-> Aggregated country counts saved to: {output_path}")
+            print(f"-> RDD processing time: {metrics['time']:.2f}s")
+            print(f"-> Corrupt Log Lines:   {metrics['corrupt']:,d}")
+            print(f"-> Task 1 total time:  {task_times['Task 1']:.2f}s")
 
-        print("\n" + "=" * 70)
-        print(" [TASK 2] FORMAT, LAYOUT & QUERY BENCHMARK (W1/W2/W3)")
-        print("=" * 70)
-        run_updated_task2(spark, args)
-        print(f"-> Benchmark metrics saved to: {args.format_results_dir}")
+        if args.task in ("all", "task2"):
+            task_start = time.perf_counter()
+            print("\n" + "=" * 70)
+            print(" [TASK 2] FORMAT, LAYOUT & QUERY BENCHMARK (W1/W2/W3)")
+            print("=" * 70)
+            run_updated_task2(spark, args)
+            task_times["Task 2"] = time.perf_counter() - task_start
+            print(f"-> Benchmark metrics saved to: {args.format_results_dir}")
+            print(f"-> Task 2 total time: {task_times['Task 2']:.2f}s")
+
+        print("\n[TASK 3] Selected task durations (Spark startup and UI wait excluded):")
+        for task_name, elapsed in task_times.items():
+            print(f"-> {task_name}: {elapsed:.2f}s")
 
         ui_url = spark.sparkContext.uiWebUrl or "(Spark UI unavailable)"
         print("\n" + "=" * 70)
