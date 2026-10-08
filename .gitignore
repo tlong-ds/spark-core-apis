@@ -5,3 +5,5 @@ __pycache__/
 data/output/
 metastore_db/
 derby.log
+runs/
+graphify-out/

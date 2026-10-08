@@ -1,0 +1,100 @@
+name: task1-spark-failure-sim
+
+x-spark-common: &spark-common
+  image: apache/spark:4.2.0-python3
+  user: "0:0" # Lab-only: allows the mounted workspace to receive evidence files.
+  working_dir: /opt/task1
+  environment:
+    PYTHONPATH: /opt/task1
+  volumes:
+    - ./:/opt/task1
+    - ./runs/docker-eventlog:/opt/spark-events
+  networks:
+    - spark-lab
+
+services:
+  spark-master:
+    <<: *spark-common
+    container_name: task1-spark-master
+    hostname: spark-master
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.master.Master
+      - --host
+      - spark-master
+      - --port
+      - "7077"
+      - --webui-port
+      - "8080"
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+
+  spark-worker-a:
+    <<: *spark-common
+    container_name: task1-spark-worker-a
+    hostname: spark-worker-a
+    depends_on:
+      - spark-master
+    ports:
+      - "8081:8081"
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.worker.Worker
+      - --cores
+      - "1"
+      - --memory
+      - 1g
+      - --webui-port
+      - "8081"
+      - spark://spark-master:7077
+
+  spark-worker-b:
+    <<: *spark-common
+    container_name: task1-spark-worker-b
+    hostname: spark-worker-b
+    depends_on:
+      - spark-master
+    ports:
+      - "8082:8081"
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.worker.Worker
+      - --cores
+      - "1"
+      - --memory
+      - 1g
+      - --webui-port
+      - "8081"
+      - spark://spark-master:7077
+
+  driver:
+    <<: *spark-common
+    container_name: task1-spark-driver
+    hostname: driver
+    depends_on:
+      - spark-master
+      - spark-worker-a
+      - spark-worker-b
+    ports:
+      - "14040:4040"
+    command: ["tail", "-f", "/dev/null"]
+
+  spark-history:
+    <<: *spark-common
+    container_name: task1-spark-history
+    hostname: spark-history
+    environment:
+      PYTHONPATH: /opt/task1
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_HISTORY_OPTS: >-
+        -Dspark.history.fs.logDirectory=file:/opt/spark-events
+        -Dspark.history.ui.port=18080
+        -Dspark.history.fs.update.interval=2s
+    command: ["/opt/spark/sbin/start-history-server.sh"]
+    ports:
+      - "18080:18080"
+
+networks:
+  spark-lab:
+    name: task1-spark-lab
