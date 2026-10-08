@@ -53,7 +53,12 @@ def load_ip_country_map(csv_path: str) -> dict:
 
 
 def resolve_ip(ip_str: str, ip_country_map: dict) -> str:
-    """Worker-side: O(1) in-memory bitwise lookup without triggering a distributed shuffle."""
+    """Worker-side in-memory bitwise lookup without a distributed shuffle.
+
+    The current implementation scans the CIDR rules, so lookup is O(R) for R
+    rules.  R is 15 in this assignment; use a prefix trie or range index only
+    when the lookup table becomes materially larger.
+    """
     try:
         ip_int = int(ipaddress.IPv4Address(ip_str))
         for (net, mask), country in ip_country_map.items():

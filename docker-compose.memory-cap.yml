@@ -1,0 +1,11 @@
+name: task1-spark-failure-sim
+
+# Optional lab override. Use with docker-compose.failure-sim.yml to impose a
+# cgroup hard limit on each worker process and its executor child process.
+# It is intentionally separate so normal simulator runs stay unconstrained.
+services:
+  spark-worker-a:
+    mem_limit: 512m
+
+  spark-worker-b:
+    mem_limit: 512m

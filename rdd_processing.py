@@ -3,6 +3,7 @@
 import argparse
 import statistics
 import time
+from pathlib import Path
 from uuid import uuid4
 
 from pyspark.sql import SparkSession, functions as F
@@ -134,6 +135,48 @@ def _summarize_rows(sc, rows, trace):
         },
         "results": dict(top),
         "execution_trace": trace.entries,
+    }
+
+
+def collect_rdd_skew_signals(sc, input_path, ip_country_map):
+    """Collect an opt-in skew diagnostic for the RDD aggregation key.
+
+    This is observability, not automatic mitigation. A high key share is a
+    reason to inspect the shuffle Stage before adding salting or repartitioning.
+    It runs outside timed comparisons and cannot contaminate benchmark medians.
+    """
+    rows = _rdd_classified_rows(sc, input_path, ip_country_map)
+    partition_counts = dict(
+        rows.mapPartitionsWithIndex(
+            lambda partition_id, items: [(partition_id, sum(1 for _ in items))]
+        ).collect()
+    )
+    country_counts = dict(
+        rows.filter(lambda row: row[0] == "valid" and row[3] == "200")
+        .map(lambda row: (row[4], 1))
+        .reduceByKey(lambda left, right: left + right)
+        .collect()
+    )
+    counts = list(partition_counts.values())
+    total_country_records = sum(country_counts.values())
+    hottest_country, hottest_count = max(
+        country_counts.items(), key=lambda item: (item[1], item[0])
+    ) if country_counts else (None, 0)
+    return {
+        "input_partition_records": partition_counts,
+        "input_partition_max_to_min": (
+            max(counts) / min(counts) if counts and min(counts) else None
+        ),
+        "valid_http_200_records": total_country_records,
+        "hottest_aggregation_key": hottest_country,
+        "hottest_key_records": hottest_count,
+        "hottest_key_share": (
+            hottest_count / total_country_records if total_country_records else 0.0
+        ),
+        "interpretation": (
+            "Diagnostic only: inspect the shuffle stage before choosing salting, "
+            "repartitioning, or another mitigation."
+        ),
     }
 
 
@@ -349,6 +392,50 @@ def write_comparison_output(comparison_df, output_path):
     print(f"Comparison metrics saved to: {comparison_output}")
 
 
+def _rdd_lineage_text(rdd):
+    lineage = rdd.toDebugString()
+    return lineage.decode("utf-8") if isinstance(lineage, bytes) else str(lineage)
+
+
+def _query_execution_text(dataframe):
+    """Return Spark SQL's parsed, optimized, and planned query representation."""
+    return dataframe._jdf.queryExecution().toString()
+
+
+def write_execution_plans(sc, spark, input_path, ip_country_map, pipelines, output_path):
+    """Persist planning evidence without including it in benchmark timing.
+
+    The DataFrame files are pre-execution plans; they document Catalyst's
+    intended physical strategy rather than claiming an AQE-finalized runtime
+    plan. The directory must not already exist to avoid overwriting evidence.
+    """
+    evidence_dir = Path(output_path)
+    evidence_dir.mkdir(parents=True, exist_ok=False)
+    for pipeline in pipelines:
+        if pipeline == "rdd":
+            rows = _rdd_classified_rows(sc, input_path, ip_country_map)
+            (evidence_dir / "rdd_lineage.txt").write_text(
+                _rdd_lineage_text(rows), encoding="utf-8"
+            )
+        elif pipeline == "dataframe":
+            rows = _dataframe_classified(spark, input_path, ip_country_map)
+            (evidence_dir / "dataframe_query_execution.txt").write_text(
+                _query_execution_text(rows), encoding="utf-8"
+            )
+        elif pipeline == "hybrid":
+            rows = _rdd_classified_rows(sc, input_path, ip_country_map)
+            (evidence_dir / "hybrid_rdd_lineage.txt").write_text(
+                _rdd_lineage_text(rows), encoding="utf-8"
+            )
+            dataframe = spark.createDataFrame(rows, OUTPUT_SCHEMA)
+            (evidence_dir / "hybrid_query_execution.txt").write_text(
+                _query_execution_text(dataframe), encoding="utf-8"
+            )
+        else:
+            raise ValueError(f"Unknown pipeline '{pipeline}'")
+    print(f"Execution-plan evidence saved to: {evidence_dir}")
+
+
 def create_spark_session(app_name, master=None):
     """Create or reuse the session selected by the Spark launcher.
 
@@ -379,6 +466,16 @@ def main():
     parser.add_argument(
         "--output-path",
         help="Compatibility output directory for top-country and comparison CSV files.",
+    )
+    parser.add_argument(
+        "--explain-output",
+        help="New directory for RDD lineage and DataFrame query-plan evidence.",
+    )
+    parser.add_argument(
+        "--rdd-skew-profile",
+        action="store_true",
+        help=("Run an untimed RDD-only key/partition skew diagnostic after the selected "
+              "pipeline. It reports signals; it does not apply an automatic mitigation."),
     )
     parser.add_argument("--bad-record-policy", choices=("skip", "quarantine", "fail"), default="skip")
     parser.add_argument("--quarantine-path", help="New output directory required by the quarantine policy")
@@ -414,6 +511,12 @@ def main():
                     sc, spark, args.output_path, "rdd", args.input_path, lookup
                 )
                 write_comparison_output(comparison_df, args.output_path)
+            if args.explain_output:
+                write_execution_plans(
+                    sc, spark, args.input_path, lookup, RUNNERS, args.explain_output
+                )
+            if args.rdd_skew_profile:
+                print("RDD skew signals:", collect_rdd_skew_signals(sc, args.input_path, lookup))
         else:
             result = _run(args.pipeline, sc, spark, args, lookup)
             print("Counts:", result["semantic_counts"])
@@ -427,6 +530,12 @@ def main():
                 write_result_output(
                     sc, spark, args.output_path, args.pipeline, args.input_path, lookup
                 )
+            if args.explain_output:
+                write_execution_plans(
+                    sc, spark, args.input_path, lookup, (args.pipeline,), args.explain_output
+                )
+            if args.rdd_skew_profile:
+                print("RDD skew signals:", collect_rdd_skew_signals(sc, args.input_path, lookup))
     finally:
         spark.stop()
 

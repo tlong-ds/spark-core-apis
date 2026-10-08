@@ -20,10 +20,20 @@ def main() -> int:
         default=None,
         help="Hold retry attempt 1 active for this many seconds so it is visible in the live Spark UI",
     )
+    parser.add_argument(
+        "--allow-destructive-capacity-test",
+        action="store_true",
+        help="Required for a scenario that deliberately attempts a cgroup OOM kill.",
+    )
     args = parser.parse_args()
+    scenario = get_scenario(args.scenario)
+    if scenario.requires_explicit_confirmation and not args.allow_destructive_capacity_test:
+        parser.error(
+            f"Scenario '{scenario.name}' is destructive; pass --allow-destructive-capacity-test."
+        )
 
     run_dir, report = run_scenario(
-        get_scenario(args.scenario),
+        scenario,
         args.lookup_path,
         args.output_root,
         args.master,

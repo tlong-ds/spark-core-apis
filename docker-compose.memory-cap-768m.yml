@@ -1,0 +1,12 @@
+name: task1-spark-failure-sim
+
+# Optional lab override for a 768 MiB worker-container ceiling. The container
+# hosts both the Standalone Worker daemon and one executor process.
+services:
+  spark-worker-a:
+    mem_limit: 768m
+    memswap_limit: 768m
+
+  spark-worker-b:
+    mem_limit: 768m
+    memswap_limit: 768m

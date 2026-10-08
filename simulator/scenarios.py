@@ -30,6 +30,12 @@ class Scenario:
     expected_job_failure: bool = False
     retry_observation_seconds: int = 0
     spark_conf: tuple[tuple[str, str], ...] = ()
+    workload: str = "semantic_pipeline"
+    hot_key_records: int = 0
+    cold_key_records: int = 0
+    partitions: int = 4
+    memory_bytes_per_partition: int = 0
+    requires_explicit_confirmation: bool = False
 
     def write_input(self, run_dir: Path) -> Path:
         path = run_dir / "scenario_input.txt"
@@ -126,6 +132,73 @@ SCENARIOS = {
         probe="dataframe_ansi_cast_failure",
         expected_job_failure=True,
         spark_conf=(("spark.task.maxFailures", "1"), ("spark.sql.ansi.enabled", "true")),
+    ),
+    "skewed_key": Scenario(
+        name="skewed_key",
+        description=(
+            "A controlled RDD aggregation with one dominant country key. It compares "
+            "groupByKey with reduceByKey so the map-side-combine mitigation is visible."
+        ),
+        capability=(
+            "controlled shuffle-key-skew exercise; demonstrates workload shape, not a "
+            "guaranteed production straggler"
+        ),
+        lines=(),
+        expected_counts={},
+        expected_top_countries={},
+        workload="skewed_key",
+        hot_key_records=20000,
+        cold_key_records=2000,
+        partitions=4,
+    ),
+    "slow_shuffle_join": Scenario(
+        name="slow_shuffle_join",
+        description=(
+            "A controlled RDD join with a hot key on both sides. It forces shuffle read/write "
+            "and reports the join cardinality; it does not claim disk spill unless Spark UI shows it."
+        ),
+        capability="controlled distributed RDD join and shuffle-observation exercise",
+        lines=(),
+        expected_counts={},
+        expected_top_countries={},
+        workload="slow_shuffle_join",
+        hot_key_records=3000,
+        cold_key_records=1000,
+        partitions=4,
+    ),
+    "memory_pressure": Scenario(
+        name="memory_pressure",
+        description=(
+            "Each RDD partition deliberately holds a bounded byte buffer during execution. "
+            "This creates safe memory pressure for executor monitoring, not a guaranteed GC or OOM event."
+        ),
+        capability="bounded per-task allocation for executor-memory observation",
+        lines=(),
+        expected_counts={},
+        expected_top_countries={},
+        workload="memory_pressure",
+        partitions=4,
+        memory_bytes_per_partition=16 * 1024 * 1024,
+    ),
+    "container_oom_expected": Scenario(
+        name="container_oom_expected",
+        description=(
+            "Destructive lab-only capacity test: each of two tasks touches a 700 MiB Python "
+            "buffer inside a worker container capped at 768 MiB. A kernel OOM kill is expected."
+        ),
+        capability=(
+            "cgroup OOM demonstration; prove it with memory.events oom_kill, not only the "
+            "Spark executor-lost message"
+        ),
+        lines=(),
+        expected_counts={},
+        expected_top_countries={},
+        workload="memory_pressure",
+        expected_job_failure=True,
+        spark_conf=(("spark.task.maxFailures", "1"),),
+        partitions=2,
+        memory_bytes_per_partition=700 * 1024 * 1024,
+        requires_explicit_confirmation=True,
     ),
 }
 

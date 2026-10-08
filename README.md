@@ -62,6 +62,16 @@ spark-submit --master 'local[*]' rdd_processing.py --pipeline rdd --bad-record-p
 # 7. Preserve the legacy CSV output convention. Writes the complete semantic
 # country aggregation and, when --compare is used, the comparison matrix.
 spark-submit --master 'local[*]' rdd_processing.py --compare --output-path data/output
+
+# 8. Persist evidence for the report: RDD lineage plus DataFrame/Hybrid query
+# plans. The target directory must not already exist.
+spark-submit --master 'local[*]' rdd_processing.py --compare \
+  --explain-output runs/task1_plan_evidence
+
+# 9. Optional, untimed RDD skew diagnostic. It reports partition/key signals
+# and never applies a mitigation automatically.
+spark-submit --master 'local[*]' rdd_processing.py --pipeline rdd \
+  --rdd-skew-profile
 ```
 
 The three implementations must agree on `valid`, `malformed`, `unknown`, HTTP-200,
@@ -110,6 +120,15 @@ scripts/run_docker_scenario.sh dataframe_ansi_cast_failure
 
 # Optional: use a 60-second observation window instead.
 scripts/run_docker_scenario.sh task_retry_once 60
+
+# Controlled workload exercises: inspect their Stage metrics in Spark UI.
+scripts/run_docker_scenario.sh skewed_key
+scripts/run_docker_scenario.sh slow_shuffle_join
+scripts/run_docker_scenario.sh memory_pressure
+
+# Destructive capacity test: requires an explicit acknowledgement. Spark UI
+# normally shows executor loss; cgroup oom_kill is the authoritative proof.
+scripts/run_docker_oom_demo.sh --confirm-oom
 ```
 
 These are deterministic `local[2]` simulations. They test record quality,

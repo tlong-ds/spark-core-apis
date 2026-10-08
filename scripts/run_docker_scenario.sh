@@ -32,6 +32,18 @@ Scenarios:
       A native DataFrame ANSI cast fails in an executor task. Spark UI shows a
       red Failed Job and CAST_INVALID_INPUT.
 
+  skewed_key
+      One aggregation key dominates. Compares groupByKey with reduceByKey; use
+      the Stage UI to compare shuffle behaviour, not final counts alone.
+
+  slow_shuffle_join
+      Two RDDs join on a hot key. Inspect the Stage UI for shuffle read/write
+      and, if present, spill metrics.
+
+  memory_pressure
+      Each task holds a bounded 16 MiB Python buffer. Inspect executor/task
+      memory behaviour; this is not a claimed OOM or GC-failure test.
+
 After a run:
   Live Driver UI:  http://localhost:14040
   History Server:  http://localhost:18080

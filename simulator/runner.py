@@ -97,6 +97,108 @@ def _run_dataframe_ansi_cast_probe(spark, input_path: str) -> dict[str, Any]:
     raise AssertionError("DataFrame ANSI cast probe unexpectedly succeeded")
 
 
+def _run_skewed_key_probe(sc, scenario: Scenario) -> dict[str, Any]:
+    """Compare a deliberately skewed key through groupByKey and reduceByKey."""
+    trace = ExecutionTrace("Simulator/Skew")
+    pairs = [("hot_country", 1)] * scenario.hot_key_records
+    pairs.extend((f"cold_country_{index}", 1) for index in range(scenario.cold_key_records))
+    base = sc.parallelize(pairs, scenario.partitions)
+    group_by_key = dict(trace.run(
+        sc,
+        "skew baseline (groupByKey -> collect)",
+        lambda: base.groupByKey().mapValues(lambda values: sum(values)).collect(),
+        ui_action="SKEW baseline: groupByKey",
+    ))
+    reduce_by_key = dict(trace.run(
+        sc,
+        "skew mitigation (reduceByKey -> collect)",
+        lambda: base.reduceByKey(lambda left, right: left + right).collect(),
+        ui_action="SKEW mitigation: reduceByKey",
+    ))
+    if group_by_key != reduce_by_key:
+        raise AssertionError("groupByKey and reduceByKey produced different semantic counts")
+    total = sum(reduce_by_key.values())
+    return {
+        "execution_trace": trace.entries,
+        "keys": len(reduce_by_key),
+        "total_records": total,
+        "hot_key": "hot_country",
+        "hot_key_records": reduce_by_key["hot_country"],
+        "hot_key_share": reduce_by_key["hot_country"] / total,
+        "interpretation": (
+            "Both paths are semantically equivalent. reduceByKey can combine values before "
+            "the shuffle; use Spark UI shuffle metrics to compare the actual run."
+        ),
+    }
+
+
+def _run_slow_shuffle_join_probe(sc, scenario: Scenario) -> dict[str, Any]:
+    """Force an RDD join whose hot key makes the output cardinality explicit."""
+    trace = ExecutionTrace("Simulator/Join")
+    left = [("hot_key", index) for index in range(scenario.hot_key_records)]
+    left.extend((f"cold_{index}", index) for index in range(scenario.cold_key_records))
+    right_hot_records = max(1, scenario.hot_key_records // 100)
+    right = [("hot_key", index) for index in range(right_hot_records)]
+    right.extend((f"cold_{index}", index) for index in range(scenario.cold_key_records))
+    joined_records = trace.run(
+        sc,
+        "shuffle join with hot key (join -> count)",
+        lambda: sc.parallelize(left, scenario.partitions).join(
+            sc.parallelize(right, scenario.partitions)
+        ).count(),
+        ui_action="JOIN: hot key shuffle",
+    )
+    expected = scenario.hot_key_records * right_hot_records + scenario.cold_key_records
+    if joined_records != expected:
+        raise AssertionError(f"expected {expected} joined records, got {joined_records}")
+    return {
+        "execution_trace": trace.entries,
+        "left_records": len(left),
+        "right_records": len(right),
+        "hot_key_left_records": scenario.hot_key_records,
+        "hot_key_right_records": right_hot_records,
+        "joined_records": joined_records,
+        "interpretation": (
+            "This action requires an RDD shuffle join. Inspect shuffle read/write and spill "
+            "metrics in the Stage UI; spill is workload- and memory-dependent."
+        ),
+    }
+
+
+def _allocate_partition_buffer(partition_id: int, _items, bytes_per_partition: int):
+    """Keep a bounded allocation live until Spark serializes one result tuple."""
+    buffer = bytearray(bytes_per_partition)
+    for offset in range(0, len(buffer), 4096):
+        buffer[offset] = partition_id % 256
+    yield partition_id, len(buffer)
+
+
+def _run_memory_pressure_probe(sc, scenario: Scenario) -> dict[str, Any]:
+    """Allocate a deliberately bounded Python buffer once per RDD task."""
+    trace = ExecutionTrace("Simulator/Memory")
+    allocations = dict(trace.run(
+        sc,
+        "bounded memory pressure (mapPartitions -> collect)",
+        lambda: sc.parallelize(range(scenario.partitions), scenario.partitions)
+        .mapPartitionsWithIndex(
+            lambda partition_id, items: _allocate_partition_buffer(
+                partition_id, items, scenario.memory_bytes_per_partition
+            )
+        ).collect(),
+        ui_action="MEMORY: bounded per-task allocation",
+    ))
+    return {
+        "execution_trace": trace.entries,
+        "partitions": scenario.partitions,
+        "bytes_per_partition": scenario.memory_bytes_per_partition,
+        "allocated_bytes_total": sum(allocations.values()),
+        "interpretation": (
+            "The allocation is intentionally bounded. Observe executor memory and task time; "
+            "this scenario does not itself prove GC overhead, spill, or OOM."
+        ),
+    }
+
+
 def _run_expected_failure_probe(spark, input_path: str, scenario: Scenario, observation_seconds: int):
     if scenario.probe == "rdd_terminal_failure":
         return _run_rdd_fault_probe(
@@ -108,6 +210,16 @@ def _run_expected_failure_probe(spark, input_path: str, scenario: Scenario, obse
     if scenario.probe == "dataframe_ansi_cast_failure":
         return _run_dataframe_ansi_cast_probe(spark, input_path)
     raise ValueError(f"Scenario '{scenario.name}' has no expected-failure probe")
+
+
+def _run_workload_probe(sc, scenario: Scenario) -> dict[str, Any]:
+    if scenario.workload == "skewed_key":
+        return _run_skewed_key_probe(sc, scenario)
+    if scenario.workload == "slow_shuffle_join":
+        return _run_slow_shuffle_join_probe(sc, scenario)
+    if scenario.workload == "memory_pressure":
+        return _run_memory_pressure_probe(sc, scenario)
+    raise ValueError(f"Scenario '{scenario.name}' has unknown workload '{scenario.workload}'")
 
 
 def run_scenario(
@@ -145,6 +257,8 @@ def run_scenario(
         "fault_injector": scenario.fault_injector,
         "retry_observation_seconds": observation_seconds,
         "spark_conf": dict(scenario.spark_conf),
+        "workload": scenario.workload,
+        "requires_explicit_confirmation": scenario.requires_explicit_confirmation,
     }
     (run_dir / "config.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 
@@ -155,6 +269,40 @@ def run_scenario(
             builder = builder.config(key, value)
         spark = builder.getOrCreate()
         spark.sparkContext.setLogLevel("WARN")
+        if scenario.workload != "semantic_pipeline":
+            try:
+                workload_result = _run_workload_probe(spark.sparkContext, scenario)
+            except Exception as exc:
+                if not scenario.expected_job_failure:
+                    raise
+                report = {
+                    "status": "EXPECTED_FAILURE",
+                    "scenario": scenario.name,
+                    "deployment": config["deployment"],
+                    "workload": scenario.workload,
+                    "observed_error": str(exc),
+                    "evidence": (
+                        "The Spark executor/job failure is expected. Confirm cgroup OOM from "
+                        "the worker memory.events oom_kill counter."
+                    ),
+                }
+            else:
+                report = {
+                    "status": "FAIL" if scenario.expected_job_failure else "PASS",
+                    "scenario": scenario.name,
+                    "deployment": config["deployment"],
+                    "workload": scenario.workload,
+                    "result": workload_result,
+                    "limitations": (
+                        "This is a controlled lab workload. Read Spark UI stage metrics before "
+                        "claiming a production bottleneck or a mitigation benefit."
+                    ),
+                }
+                if scenario.expected_job_failure:
+                    report["assertion_failures"] = [
+                        "expected a destructive capacity failure, but workload completed"
+                    ]
+            return _persist_report(run_dir, scenario.name, report)
         lookup = load_ip_country_map(lookup_path)
         if scenario.expected_job_failure:
             try:
