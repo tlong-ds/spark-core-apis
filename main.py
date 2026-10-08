@@ -1,4 +1,4 @@
-"""Run Task 1 and the updated Task 2 in one Spark application."""
+"""Run Task 1 and Task 2 in one Spark application."""
 
 import argparse
 import json
@@ -76,12 +76,9 @@ def join_output_path(base_path, child_name):
     return posixpath.join(base_path.rstrip("/"), child_name)
 
 
-def run_updated_task2(spark, args):
-    """Reuse Task 2's benchmark functions without calling its standalone main().
+def run_task2(spark, args):
+    spark.sparkContext.setJobGroup("TASK_2", "Task 2: Storage Format & Layout Benchmark")
 
-    The standalone main() creates and stops its own SparkSession. Here the
-    Task 3 SparkSession must survive through the classroom UI demonstration.
-    """
     benchmark.setup_logging(args.format_logs_dir)
     config, config_source = benchmark.load_config(args.format_config)
     if args.sample_fraction is not None:
@@ -104,6 +101,7 @@ def run_updated_task2(spark, args):
     benchmark.warn_if_windows_without_hadoop()
 
     try:
+        spark.sparkContext.setJobDescription("Task 2: Load & Sample Source Flights Dataset")
         source_df = benchmark.load_source_data(
             spark,
             args.format_input,
@@ -123,6 +121,8 @@ def run_updated_task2(spark, args):
                 raise ValueError(f"Unsupported representation format: {fmt}")
             path = os.path.join(generated_dir, f"representation_{fmt}")
             spark.catalog.clearCache()
+
+            spark.sparkContext.setJobDescription(f"Task 2: Write Format [{fmt.upper()}] Dataset")
             write_time = benchmark.write_dataset(
                 source_df, path, fmt, config["compression"][fmt]
             )
@@ -163,6 +163,8 @@ def run_updated_task2(spark, args):
         for layout_name, transform in layout_specs:
             path = os.path.join(layout_dir, layout_name)
             spark.catalog.clearCache()
+
+            spark.sparkContext.setJobDescription(f"Task 2: Write Parquet Layout [{layout_name}]")
             write_time = benchmark.write_dataset(
                 source_df,
                 path,
@@ -193,6 +195,8 @@ def run_updated_task2(spark, args):
             generated_dir, "partitioned_parquet_year_month"
         )
         spark.catalog.clearCache()
+
+        spark.sparkContext.setJobDescription("Task 2: Write Partitioned Parquet (Year/Month)")
         partitioned_write_time = benchmark.write_dataset(
             source_df,
             partitioned_path,
@@ -202,6 +206,7 @@ def run_updated_task2(spark, args):
         )
         partitioned_storage = benchmark.storage_metadata(partitioned_path)
 
+        # Chạy ma trận benchmark (Tên từng Job sẽ do format_benchmark.run_cells tự đổi chi tiết)
         representation_raw = benchmark.run_cells(spark, representation_cells, config)
         layout_raw = benchmark.run_cells(spark, layout_cells, config)
         representation_summary = benchmark.summarize_rows(representation_raw)
@@ -210,6 +215,8 @@ def run_updated_task2(spark, args):
         evidence_rows = []
         partitioned_df = benchmark.reader_for(spark, "parquet", partitioned_path)
         spark.catalog.clearCache()
+
+        spark.sparkContext.setJobDescription("Task 2: Probe - Partition Pruning (W2 Query)")
         pruning_start = time.perf_counter()
         pruning_result = benchmark.workload(partitioned_df, "W2", config).collect()
         pruning_runtime = time.perf_counter() - pruning_start
@@ -232,6 +239,8 @@ def run_updated_task2(spark, args):
             .select(benchmark.ARRIVAL_DELAY_COL)
             .agg(F.count(F.lit(1)))
         )
+
+        spark.sparkContext.setJobDescription("Task 2: Probe - Predicate Pushdown Query")
         benchmark.save_plan(
             args.format_results_dir,
             "predicate_pushdown_arrival_delay",
@@ -370,6 +379,7 @@ def run_updated_task2(spark, args):
         )
         return metadata
     finally:
+        spark.sparkContext.setJobDescription(None)
         if args.clean_generated:
             benchmark.clean_dir(args.format_data_dir)
 
@@ -402,6 +412,9 @@ def main():
     try:
         task_times = {}
         if args.task in ("all", "task1"):
+            spark.sparkContext.setJobGroup("TASK_1", "Task 1: RDD Log Processing")
+            spark.sparkContext.setJobDescription("Task 1: Process RDD Logs with Broadcast & Accumulators")
+
             task_start = time.perf_counter()
             print("\n" + "=" * 70)
             print(" [TASK 1] PROCESSING LOGS (RDD + BROADCAST CIDR + ACCUMULATOR)")
@@ -425,7 +438,7 @@ def main():
             print("\n" + "=" * 70)
             print(" [TASK 2] FORMAT, LAYOUT & QUERY BENCHMARK (W1/W2/W3)")
             print("=" * 70)
-            run_updated_task2(spark, args)
+            run_task2(spark, args)
             task_times["Task 2"] = time.perf_counter() - task_start
             print(f"-> Benchmark metrics saved to: {args.format_results_dir}")
             print(f"-> Task 2 total time: {task_times['Task 2']:.2f}s")
@@ -442,6 +455,7 @@ def main():
         if args.interactive:
             input("\n[LIVE DEMO] Press [Enter] to terminate Spark UI...")
     finally:
+        spark.sparkContext.setJobDescription(None)
         spark.stop()
 
 
