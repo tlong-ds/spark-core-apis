@@ -255,6 +255,10 @@ def summarize_rows(raw_rows):
 
 
 def run_cells(spark, cells, config):
+    """
+    Thực thi ma trận các bài test đo thời gian đọc dữ liệu.
+    Đã được cập nhật để gán tên Job chi tiết tới từng cell/lượt chạy trên Spark Web UI.
+    """
     benchmark_config = config["benchmark"]
     if benchmark_config["warmup_runs"] != 1:
         raise ValueError("This benchmark requires benchmark.warmup_runs to be exactly 1")
@@ -266,27 +270,41 @@ def run_cells(spark, cells, config):
         round_cells = list(cells)
         rng.shuffle(round_cells)
         for cell in round_cells:
-            spark.catalog.clearCache()
-            read_df = reader_for(spark, cell["format"], cell["path"])
-            start = time.perf_counter()
-            result = workload(read_df, cell["workload"], config).collect()
-            elapsed = time.perf_counter() - start
-            execution_order += 1
-            if phase == "measured":
-                result_rows.append(
-                    {
-                        "format": cell["format"],
-                        "layout": cell["layout"],
-                        "workload": cell["workload"],
-                        "run_number": run_number,
-                        "execution_order": execution_order,
-                        "runtime_sec": elapsed,
-                        "result_rows": len(result),
-                        "path": cell["path"],
-                        "num_data_files": cell["storage"]["num_data_files"],
-                        "output_size_bytes": cell["storage"]["output_size_bytes"],
-                    }
-                )
+            fmt = cell["format"].upper()
+            layout = cell["layout"]
+            workload_name = cell["workload"]
+            run_label = "Warmup" if phase == "warmup" else f"Run #{run_number}"
+
+            # Gán mô tả chi tiết cho từng Job trên Spark UI
+            job_desc = f"Task 2: [{fmt}] Layout: {layout} | Workload: {workload_name} | {run_label}"
+            spark.sparkContext.setJobDescription(job_desc)
+
+            try:
+                spark.catalog.clearCache()
+                read_df = reader_for(spark, cell["format"], cell["path"])
+                start = time.perf_counter()
+                result = workload(read_df, cell["workload"], config).collect()
+                elapsed = time.perf_counter() - start
+                execution_order += 1
+                if phase == "measured":
+                    result_rows.append(
+                        {
+                            "format": cell["format"],
+                            "layout": cell["layout"],
+                            "workload": cell["workload"],
+                            "run_number": run_number,
+                            "execution_order": execution_order,
+                            "runtime_sec": elapsed,
+                            "result_rows": len(result),
+                            "path": cell["path"],
+                            "num_data_files": cell["storage"]["num_data_files"],
+                            "output_size_bytes": cell["storage"]["output_size_bytes"],
+                        }
+                    )
+            finally:
+                # Reset lại tên job sau khi chạy xong cell này
+                spark.sparkContext.setJobDescription(None)
+
     return result_rows
 
 
@@ -411,6 +429,9 @@ def main():
     )
 
     try:
+        spark.sparkContext.setJobGroup("TASK_2", "Task 2: Storage Format & Layout Benchmark")
+
+        spark.sparkContext.setJobDescription("Task 2: Load Source Flights Dataset")
         source_df = load_source_data(spark, args.input, sample_fraction, config["benchmark"]["random_seed"])
         spark.catalog.clearCache()
         row_count = source_df.count()
@@ -425,6 +446,8 @@ def main():
                 raise ValueError(f"Unsupported representation format: {fmt}")
             path = os.path.join(generated_dir, f"representation_{fmt}")
             spark.catalog.clearCache()
+
+            spark.sparkContext.setJobDescription(f"Task 2: Write Format [{fmt.upper()}] Dataset")
             write_time = write_dataset(source_df, path, fmt, config["compression"][fmt])
             storage = storage_metadata(path)
             format_write_rows.append({"format": fmt, "layout": "baseline", "write_time_sec": write_time, **storage})
@@ -444,6 +467,8 @@ def main():
         for layout_name, transform in layout_specs:
             path = os.path.join(layout_dir, layout_name)
             spark.catalog.clearCache()
+
+            spark.sparkContext.setJobDescription(f"Task 2: Write Parquet Layout [{layout_name}]")
             write_time = write_dataset(source_df, path, "parquet", config["compression"]["parquet"], transform=transform)
             storage = storage_metadata(path)
             layout_write_rows.append({"format": "parquet", "layout": layout_name, "write_time_sec": write_time, **storage})
@@ -451,9 +476,12 @@ def main():
 
         partitioned_path = os.path.join(generated_dir, "partitioned_parquet_year_month")
         spark.catalog.clearCache()
+
+        spark.sparkContext.setJobDescription("Task 2: Write Partitioned Parquet (Year/Month)")
         partitioned_write_time = write_dataset(source_df, partitioned_path, "parquet", config["compression"]["parquet"], partition_by=PARTITION_COLS)
         partitioned_storage = storage_metadata(partitioned_path)
 
+        # Chạy ma trận benchmark đọc dữ liệu (tên các job được xử lý tự động bên trong run_cells)
         representation_raw = run_cells(spark, representation_cells, config)
         layout_raw = run_cells(spark, layout_cells, config)
         representation_summary = summarize_rows(representation_raw)
@@ -462,13 +490,18 @@ def main():
         evidence_rows = []
         partitioned_df = reader_for(spark, "parquet", partitioned_path)
         spark.catalog.clearCache()
+
+        spark.sparkContext.setJobDescription("Task 2: Probe - Partition Pruning (W2 Query)")
         pruning_start = time.perf_counter()
         pruning_result = workload(partitioned_df, "W2", config).collect()
         pruning_runtime = time.perf_counter() - pruning_start
         save_plan(args.results_dir, "partition_pruning_w2", workload(partitioned_df, "W2", config), "partition_pruning", "parquet", "partitioned_year_month", "W2", evidence_rows)
+
         parquet_df = reader_for(spark, "parquet", os.path.join(generated_dir, "representation_parquet"))
         threshold = config["workloads"]["W2_pushdown"]["arrival_delay_gt"]
         pushdown_query = parquet_df.filter(F.col(ARRIVAL_DELAY_COL) > threshold).select(ARRIVAL_DELAY_COL).agg(F.count(F.lit(1)))
+
+        spark.sparkContext.setJobDescription("Task 2: Probe - Predicate Pushdown Query")
         save_plan(args.results_dir, "predicate_pushdown_arrival_delay", pushdown_query, "predicate_pushdown", "parquet", "baseline", "W2_pushdown", evidence_rows)
         save_plan(args.results_dir, "column_pruning_w3", workload(parquet_df, "W3", config), "column_pruning", "parquet", "baseline", "W3", evidence_rows)
 
@@ -500,6 +533,7 @@ def main():
             json.dump(metadata, handle, indent=2)
         logger.info("Benchmark finished successfully. Results written to %s", args.results_dir)
     finally:
+        spark.sparkContext.setJobDescription(None)
         spark.stop()
         if args.clean_generated:
             clean_dir(args.data_dir)
