@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="31.0.2">
+  <diagram id="task1-hybrid-pipeline" name="Hybrid RDD to DataFrame Pipeline">
+    <mxGraphModel dx="1950" dy="1200" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1950" pageHeight="1150" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+
+        <!-- Header -->
+        <mxCell id="2" value="Task 1 Hybrid Pipeline — RDD Parsing to Structured DataFrame Analytics" style="text;html=1;align=center;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1">
+          <mxGeometry x="250" y="25" width="1450" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="2b" value="Architectural Boundary: Procedural RDD parsing for messy logs → Explicit StructType mapping → Catalyst-optimized DataFrame queries" style="text;html=1;align=center;verticalAlign=middle;fontSize=15;fontStyle=2;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="250" y="65" width="1450" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Tier 1: Low-Level RDD Parsing -->
+        <mxCell id="3" value="Tier 1: Low-Level RDD Processing (Python / Lineage)" style="swimlane;html=1;startSize=36;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;horizontal=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="120" width="450" height="830" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" value="sc.textFile(input_path)&#xa;Read raw text files as RDD[String]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=15;" vertex="1" parent="3">
+          <mxGeometry x="60" y="60" width="330" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" value="flatMap(unpack_compound_logs)&#xa;Split compound logs (; separator)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=15;" vertex="1" parent="3">
+          <mxGeometry x="60" y="160" width="330" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="6" value="map(parse_log_entry)&#xa;Regex extraction (IP, status, endpoint)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=15;" vertex="1" parent="3">
+          <mxGeometry x="60" y="265" width="330" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="7" value="map(_classify_parsed)&#xa;+ Broadcast CIDR Lookup Table&#xa;Valid / Malformed / Unknown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=15;" vertex="1" parent="3">
+          <mxGeometry x="60" y="370" width="330" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="8" value="rows (Classified RDD)&#xa;RDD of canonical output tuples:&#xa;(state, reason, ip, status, country, raw)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=16;" vertex="1" parent="3">
+          <mxGeometry x="50" y="490" width="350" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="8b" value="Ưu thế của RDD tại Tier 1:&#xa;• Linh hoạt xử lý cấu trúc log phi tiêu chuẩn&#xa;• Tách dòng compound và Regex an toàn&#xa;• Lookup dải CIDR nhị phân tùy biến" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#94a3b8;fontSize=14;align=left;spacingLeft=12;fontColor=#334155;" vertex="1" parent="3">
+          <mxGeometry x="50" y="640" width="350" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- Tier 2: Boundary Bridge -->
+        <mxCell id="9" value="Tier 2: Boundary Bridge" style="swimlane;html=1;startSize=36;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=16;horizontal=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="290" width="380" height="500" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" value="OUTPUT_SCHEMA&#xa;StructType([&#xa;  record_state, reason, ip,&#xa;  http_status, country, raw&#xa;])" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontStyle=1;fontSize=14;align=left;spacingLeft=16;" vertex="1" parent="9">
+          <mxGeometry x="40" y="60" width="300" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" value="spark.createDataFrame(rows, schema)&#xa;Chuyển đổi RDD → DataFrame&#xa;Không collect dữ liệu về Driver" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=15;" vertex="1" parent="9">
+          <mxGeometry x="40" y="200" width="300" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" value="classified_df (DataFrame)&#xa;Structured representation sẵn sàng&#xa;cho bộ tối ưu Catalyst" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=15;" vertex="1" parent="9">
+          <mxGeometry x="40" y="325" width="300" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="12b" value="Khóa Schema tường minh, loại bỏ Schema Inference" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#64748b;" vertex="1" parent="9">
+          <mxGeometry x="20" y="425" width="340" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Tier 3: Structured DataFrame Analytics -->
+        <mxCell id="20" value="Tier 3: Structured DataFrame Actions (Catalyst Optimizer &amp; Tungsten)" style="swimlane;html=1;startSize=36;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=16;horizontal=1;" vertex="1" parent="1">
+          <mxGeometry x="980" y="120" width="910" height="830" as="geometry"/>
+        </mxCell>
+
+        <!-- Action 1 / Job 0 -->
+        <mxCell id="21" value="Action 1: Semantic Counts (Job 0)" style="swimlane;html=1;startSize=30;fillColor=#ffffff;strokeColor=#82b366;fontStyle=1;fontSize=15;" vertex="1" parent="20">
+          <mxGeometry x="35" y="50" width="840" height="210" as="geometry"/>
+        </mxCell>
+        <mxCell id="22" value="classified_df&#xa;.groupBy(&quot;record_state&quot;)&#xa;Partial HashAggregate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="21">
+          <mxGeometry x="40" y="55" width="230" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="23" value="Exchange&#xa;hashpartitioning&#xa;(Shuffle by state)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;" vertex="1" parent="21">
+          <mxGeometry x="320" y="70" width="160" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="24" value=".count().collect()&#xa;Final HashAggregate&#xa;→ Valid, Malformed, Unknown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;" vertex="1" parent="21">
+          <mxGeometry x="530" y="55" width="260" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- Action 2 / Job 1 -->
+        <mxCell id="30" value="Action 2: Top Countries for Valid HTTP 200 (Job 1)" style="swimlane;html=1;startSize=30;fillColor=#ffffff;strokeColor=#82b366;fontStyle=1;fontSize=15;" vertex="1" parent="20">
+          <mxGeometry x="35" y="285" width="840" height="240" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" value=".filter(state == &apos;valid&apos; &amp;&#xa;        status == &apos;200&apos;)&#xa;Catalyst Filter Pushdown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="30">
+          <mxGeometry x="30" y="60" width="210" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" value=".groupBy(&quot;country&quot;)&#xa;Exchange (Shuffle by country)&#xa;HashAggregate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;" vertex="1" parent="30">
+          <mxGeometry x="270" y="60" width="220" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="33" value=".orderBy(desc(&apos;access_count&apos;))&#xa;.limit(10).collect()&#xa;TakeOrderedAndProject (Top 10)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;" vertex="1" parent="30">
+          <mxGeometry x="520" y="60" width="280" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="34" value="Đạt chuẩn Top-k tương đương 100% với nhánh RDD và DataFrame" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#64748b;" vertex="1" parent="30">
+          <mxGeometry x="220" y="180" width="400" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Action 3 / Job 2 -->
+        <mxCell id="40" value="Action 3: Total HTTP 200 Count (Job 2)" style="swimlane;html=1;startSize=30;fillColor=#ffffff;strokeColor=#82b366;fontStyle=1;fontSize=15;" vertex="1" parent="20">
+          <mxGeometry x="35" y="550" width="840" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="41" value=".filter(http_status == &apos;200&apos;)&#xa;Predicate Filter cục bộ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="40">
+          <mxGeometry x="80" y="55" width="280" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="42" value=".count()&#xa;Narrow Stage (No Shuffle boundary)&#xa;Partial count → Sum at Driver" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;" vertex="1" parent="40">
+          <mxGeometry x="450" y="55" width="310" height="75" as="geometry"/>
+        </mxCell>
+
+        <!-- Tier 3 Summary Note -->
+        <mxCell id="43" value="Ưu thế của DataFrame tại Tier 3: Catalyst Optimizer chọn Physical Plan tối ưu, Tungsten quản lý bộ nhớ binary off-heap, Whole-Stage CodeGen tăng tốc độ tính toán gấp nhiều lần." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#94a3b8;fontSize=13;align=center;fontColor=#334155;" vertex="1" parent="20">
+          <mxGeometry x="35" y="745" width="840" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- Intra-Tier 1 Edges -->
+        <mxCell id="50" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;" edge="1" parent="3" source="4" target="5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="51" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;" edge="1" parent="3" source="5" target="6">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="52" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;" edge="1" parent="3" source="6" target="7">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="53" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;" edge="1" parent="3" source="7" target="8">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Intra-Tier 2 Edges -->
+        <mxCell id="54" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="9" source="10" target="11">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="55" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;" edge="1" parent="9" source="11" target="12">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Inter-Tier Connections: Tier 1 to Tier 2 -->
+        <mxCell id="60" value="createDataFrame(rows)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;fontSize=13;fontStyle=1;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="8" target="11">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Inter-Tier Connections: Tier 2 to Tier 3 Actions -->
+        <mxCell id="61" value="Action 1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16a34a;strokeWidth=2;fontSize=13;fontStyle=1;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="12" target="21">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="950" y="638"/>
+              <mxPoint x="950" y="275"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="62" value="Action 2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16a34a;strokeWidth=2;fontSize=13;fontStyle=1;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="12" target="30">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="965" y="653"/>
+              <mxPoint x="965" y="525"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="63" value="Action 3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16a34a;strokeWidth=2;fontSize=13;fontStyle=1;labelBackgroundColor=#ffffff;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="12" target="40">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="950" y="668"/>
+              <mxPoint x="950" y="755"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Intra-Action Edges inside Tier 3 -->
+        <mxCell id="70" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;" edge="1" parent="21" source="22" target="23">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="71" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;" edge="1" parent="21" source="23" target="24">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="72" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;" edge="1" parent="30" source="31" target="32">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="73" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;" edge="1" parent="30" source="32" target="33">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="74" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;" edge="1" parent="40" source="41" target="42">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

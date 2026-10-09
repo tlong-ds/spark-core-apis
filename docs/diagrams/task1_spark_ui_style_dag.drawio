@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="31.0.2">
+  <diagram id="spark-ui-style-dag" name="Spark UI style DAG">
+    <mxGraphModel dx="900" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="780" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="DAG Visualization — Spark UI layout reference" style="text;html=1;align=center;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="30" y="15" width="790" height="30" as="geometry"/></mxCell>
+        <mxCell id="3" value="Stage 0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ffb6c1;fontSize=13;fontColor=#555555;" vertex="1" parent="1"><mxGeometry x="25" y="70" width="165" height="630" as="geometry"/></mxCell>
+        <mxCell id="4" value="Stage 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ffb6c1;fontSize=13;fontColor=#555555;" vertex="1" parent="1"><mxGeometry x="245" y="70" width="165" height="630" as="geometry"/></mxCell>
+        <mxCell id="5" value="Stage 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ffb6c1;fontSize=13;fontColor=#555555;" vertex="1" parent="1"><mxGeometry x="465" y="70" width="165" height="630" as="geometry"/></mxCell>
+        <mxCell id="6" value="WholeStageCodegen" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="3"><mxGeometry x="23" y="60" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="7" value="Generate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="3"><mxGeometry x="35" y="175" width="96" height="55" as="geometry"/></mxCell>
+        <mxCell id="8" value="WholeStageCodegen" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="3"><mxGeometry x="23" y="275" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="9" value="Exchange" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="3"><mxGeometry x="35" y="405" width="96" height="65" as="geometry"/></mxCell>
+        <mxCell id="10" value="Exchange" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="4"><mxGeometry x="35" y="60" width="96" height="65" as="geometry"/></mxCell>
+        <mxCell id="11" value="WholeStageCodegen" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="4"><mxGeometry x="23" y="170" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="12" value="ObjectHashAggregate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="4"><mxGeometry x="23" y="285" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="13" value="WholeStageCodegen" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="4"><mxGeometry x="23" y="400" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="14" value="Exchange" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="4"><mxGeometry x="35" y="520" width="96" height="65" as="geometry"/></mxCell>
+        <mxCell id="15" value="Exchange" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="5"><mxGeometry x="35" y="60" width="96" height="65" as="geometry"/></mxCell>
+        <mxCell id="16" value="ObjectHashAggregate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="5"><mxGeometry x="23" y="170" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="17" value="WholeStageCodegen" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="5"><mxGeometry x="23" y="285" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="18" value="DeserializeToObject" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="5"><mxGeometry x="23" y="400" width="120" height="70" as="geometry"/></mxCell>
+        <mxCell id="19" value="mapPartitions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9dd7f5;strokeColor=#64b5e0;fontSize=12;" vertex="1" parent="5"><mxGeometry x="35" y="520" width="96" height="65" as="geometry"/></mxCell>
+        <mxCell id="20" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="3" source="6" target="7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="21" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="3" source="7" target="8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="22" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="3" source="8" target="9"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="10" target="11"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="24" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="11" target="12"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="12" target="13"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="26" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="13" target="14"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="27" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="5" source="15" target="16"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="28" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="5" source="16" target="17"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="29" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="5" source="17" target="18"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="30" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="5" source="18" target="19"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="31" style="curved=1;html=1;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="9" target="10"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="220" y="470"/><mxPoint x="220" y="170"/></Array></mxGeometry></mxCell>
+        <mxCell id="32" style="curved=1;html=1;endArrow=block;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="14" target="15"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="440" y="585"/><mxPoint x="440" y="170"/></Array></mxGeometry></mxCell>
+        <mxCell id="33" value="Spark UI-style layout: pink outline = Stage; blue block = physical operator; curved edge = dependency across an Exchange." style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#666666;" vertex="1" parent="1"><mxGeometry x="35" y="720" width="780" height="25" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

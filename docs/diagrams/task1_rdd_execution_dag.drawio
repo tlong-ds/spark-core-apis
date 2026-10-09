@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="31.0.2">
+  <diagram id="task1-job0-dag" name="Job 0 semantic counts">
+    <mxGraphModel dx="1100" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="Task 1 RDD — Job 0: semantic counts" style="text;html=1;align=center;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="80" y="30" width="760" height="40" as="geometry"/></mxCell>
+        <mxCell id="3" value="Spark DAG Visualization: the action is reduceByKey → collect" style="text;html=1;align=center;verticalAlign=middle;fontSize=14;fontColor=#4b5563;" vertex="1" parent="1"><mxGeometry x="80" y="75" width="760" height="25" as="geometry"/></mxCell>
+        <mxCell id="4" value="Stage 0 — map side (4 tasks)" style="swimlane;startSize=30;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="210" y="130" width="500" height="470" as="geometry"/></mxCell>
+        <mxCell id="5" value="textFile&#xa;data/raw_logs.txt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="55" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="6" value="flatMap&#xa;split compound log lines" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="145" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="7" value="map(parse_log_entry)&#xa;parse valid or malformed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="235" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="8" value="map(classify)&#xa;broadcast CIDR lookup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="325" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="9" value="map(record_state, 1)&#xa;reduceByKey map-side combine" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" vertex="1" parent="4"><mxGeometry x="125" y="405" width="250" height="55" as="geometry"/></mxCell>
+        <mxCell id="10" value="shuffle write&#xa;key = record_state" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=14;" vertex="1" parent="1"><mxGeometry x="350" y="640" width="220" height="65" as="geometry"/></mxCell>
+        <mxCell id="11" value="Shuffle boundary&#xa;Spark ends Stage 0 and starts Stage 1" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#b85450;" vertex="1" parent="1"><mxGeometry x="600" y="650" width="310" height="45" as="geometry"/></mxCell>
+        <mxCell id="12" value="Stage 1 — reduce side (4 tasks)" style="swimlane;startSize=30;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="210" y="750" width="500" height="220" as="geometry"/></mxCell>
+        <mxCell id="13" value="reduce-side aggregate&#xa;sum counts per record_state" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;" vertex="1" parent="12"><mxGeometry x="125" y="55" width="250" height="55" as="geometry"/></mxCell>
+        <mxCell id="14" value="collect → driver&#xa;valid / malformed / unknown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;" vertex="1" parent="12"><mxGeometry x="125" y="135" width="250" height="55" as="geometry"/></mxCell>
+        <mxCell id="15" value="Job 1 (top countries) and Job 2 (HTTP 200 count) each have their own DAG." style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontColor=#4b5563;" vertex="1" parent="1"><mxGeometry x="100" y="1000" width="720" height="30" as="geometry"/></mxCell>
+        <mxCell id="16" value="shuffle read into Stage 1" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#b85450;" vertex="1" parent="1"><mxGeometry x="735" y="775" width="190" height="25" as="geometry"/></mxCell>
+        <mxCell id="20" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="4" source="5" target="6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="21" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="4" source="6" target="7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="22" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="4" source="7" target="8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="4" source="8" target="9"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="24" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="9" target="10"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="10" target="13"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="26" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="12" source="13" target="14"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="task1-job1-dag" name="Job 1 top countries">
+    <mxGraphModel dx="1100" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="2" value="Task 1 RDD — Job 1: top countries for valid HTTP 200" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="60" y="30" width="820" height="40" as="geometry"/></mxCell>
+        <mxCell id="3" value="Spark DAG Visualization: filter → reduceByKey → takeOrdered(10)" style="text;html=1;align=center;verticalAlign=middle;fontSize=14;fontColor=#4b5563;" vertex="1" parent="1"><mxGeometry x="80" y="75" width="760" height="25" as="geometry"/></mxCell>
+        <mxCell id="4" value="Stage 2 — map side (4 tasks)" style="swimlane;startSize=30;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="210" y="130" width="500" height="560" as="geometry"/></mxCell>
+        <mxCell id="5" value="textFile&#xa;data/raw_logs.txt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="55" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="6" value="flatMap&#xa;split compound log lines" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="135" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="7" value="map(parse_log_entry)&#xa;parse valid or malformed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="215" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="8" value="map(classify)&#xa;broadcast CIDR lookup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="295" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="9" value="filter(valid &amp;&amp; HTTP 200)&#xa;map(country, 1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="125" y="375" width="250" height="55" as="geometry"/></mxCell>
+        <mxCell id="10" value="reduceByKey&#xa;map-side combine" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" vertex="1" parent="4"><mxGeometry x="125" y="475" width="250" height="55" as="geometry"/></mxCell>
+        <mxCell id="11" value="shuffle write&#xa;key = country" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=14;" vertex="1" parent="1"><mxGeometry x="350" y="730" width="220" height="65" as="geometry"/></mxCell>
+        <mxCell id="12" value="Shuffle boundary&#xa;Spark ends Stage 2 and starts Stage 3" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#b85450;" vertex="1" parent="1"><mxGeometry x="600" y="740" width="310" height="45" as="geometry"/></mxCell>
+        <mxCell id="13" value="Stage 3 — reduce side (4 tasks)" style="swimlane;startSize=30;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="210" y="840" width="500" height="220" as="geometry"/></mxCell>
+        <mxCell id="14" value="reduce-side aggregate&#xa;sum accesses per country" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;" vertex="1" parent="13"><mxGeometry x="125" y="55" width="250" height="55" as="geometry"/></mxCell>
+        <mxCell id="15" value="takeOrdered(10) → driver&#xa;top countries" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;" vertex="1" parent="13"><mxGeometry x="125" y="135" width="250" height="55" as="geometry"/></mxCell>
+        <mxCell id="16" value="shuffle read into Stage 3" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#b85450;" vertex="1" parent="1"><mxGeometry x="735" y="865" width="190" height="25" as="geometry"/></mxCell>
+        <mxCell id="20" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="5" target="6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="21" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="6" target="7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="22" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="7" target="8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="8" target="9"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="24" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="9" target="10"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="10" target="11"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="26" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="11" target="14"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="27" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="13" source="14" target="15"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="task1-job2-dag" name="Job 2 HTTP 200 count">
+    <mxGraphModel dx="1100" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="2" value="Task 1 RDD — Job 2: HTTP 200 count" style="text;html=1;align=center;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="80" y="30" width="760" height="40" as="geometry"/></mxCell>
+        <mxCell id="3" value="Spark DAG Visualization: filter → count (one stage, no shuffle)" style="text;html=1;align=center;verticalAlign=middle;fontSize=14;fontColor=#4b5563;" vertex="1" parent="1"><mxGeometry x="80" y="75" width="760" height="25" as="geometry"/></mxCell>
+        <mxCell id="4" value="Stage 4 — one narrow stage (4 tasks)" style="swimlane;startSize=30;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="210" y="130" width="500" height="610" as="geometry"/></mxCell>
+        <mxCell id="5" value="textFile&#xa;data/raw_logs.txt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="55" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="6" value="flatMap&#xa;split compound log lines" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="135" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="7" value="map(parse_log_entry)&#xa;parse valid or malformed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="215" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="8" value="map(classify)&#xa;broadcast CIDR lookup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="295" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="9" value="filter(http_status == 200)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="385" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="10" value="count → driver&#xa;HTTP 200 total" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" vertex="1" parent="4"><mxGeometry x="145" y="485" width="210" height="55" as="geometry"/></mxCell>
+        <mxCell id="11" value="No reduceByKey and no shuffle: the count action returns one aggregate result." style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#4b5563;" vertex="1" parent="1"><mxGeometry x="750" y="480" width="300" height="55" as="geometry"/></mxCell>
+        <mxCell id="20" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="5" target="6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="21" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="6" target="7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="22" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="7" target="8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="8" target="9"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="24" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="4" source="9" target="10"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
+from pyspark import StorageLevel
 from pyspark.sql import SparkSession, functions as F
 from pyspark.sql.types import StringType, StructField, StructType
 
@@ -212,13 +213,21 @@ def _summarize_dataframe(sc, rows, trace):
     }
 
 
-def execute_rdd_job(sc, spark, input_path, ip_country_map):
+def execute_rdd_job(sc, spark, input_path, ip_country_map, cache_rows=False):
     """Pure RDD: parsing, CIDR lookup, and aggregation remain in RDDs."""
     invalid_log_counter = sc.accumulator(0)
     trace = ExecutionTrace("RDD")
     started = time.perf_counter()
     rows = _rdd_classified_rows(sc, input_path, ip_country_map, invalid_log_counter)
-    summary = _summarize_rows(sc, rows, trace)
+    if cache_rows:
+        # Persisting is lazy: Job 0 populates this cache, then Jobs 1 and 2
+        # reuse the classified partitions instead of parsing the input again.
+        rows.persist(StorageLevel.MEMORY_AND_DISK)
+    try:
+        summary = _summarize_rows(sc, rows, trace)
+    finally:
+        if cache_rows:
+            rows.unpersist(blocking=False)
     summary.update(time=time.perf_counter() - started,
                    operator="RDD parser + broadcast CIDR + reduceByKey",
                    input_partitions=sc.textFile(input_path).getNumPartitions(),
@@ -272,14 +281,20 @@ def execute_dataframe_job(spark, input_path, ip_country_map):
     return summary
 
 
-def execute_hybrid_job(sc, spark, input_path, ip_country_map):
+def execute_hybrid_job(sc, spark, input_path, ip_country_map, cache_rows=False):
     """Hybrid: RDD parser plus explicit-schema DataFrame aggregation."""
     invalid_log_counter = sc.accumulator(0)
     trace = ExecutionTrace("Hybrid")
     started = time.perf_counter()
     rows = _rdd_classified_rows(sc, input_path, ip_country_map, invalid_log_counter)
-    classified_df = spark.createDataFrame(rows, OUTPUT_SCHEMA)
-    summary = _summarize_dataframe(sc, classified_df, trace)
+    if cache_rows:
+        rows.persist(StorageLevel.MEMORY_AND_DISK)
+    try:
+        classified_df = spark.createDataFrame(rows, OUTPUT_SCHEMA)
+        summary = _summarize_dataframe(sc, classified_df, trace)
+    finally:
+        if cache_rows:
+            rows.unpersist(blocking=False)
     summary.update(
         time=time.perf_counter() - started,
         operator="RDD parser + explicit StructType + DataFrame aggregation",
@@ -294,7 +309,7 @@ RUNNERS = {"rdd": execute_rdd_job, "dataframe": execute_dataframe_job, "hybrid":
 
 def _run(name, sc, spark, args, lookup):
     return (RUNNERS[name](spark, args.input_path, lookup) if name == "dataframe"
-            else RUNNERS[name](sc, spark, args.input_path, lookup))
+            else RUNNERS[name](sc, spark, args.input_path, lookup, cache_rows=args.cache_rows))
 
 
 def _assert_equivalent(results):
@@ -462,6 +477,12 @@ def main():
     )
     parser.add_argument("--compare", action="store_true")
     parser.add_argument("--pipeline", choices=RUNNERS, default="rdd")
+    parser.add_argument(
+        "--cache-rows",
+        action="store_true",
+        help=("Persist classified RDD rows with MEMORY_AND_DISK for the RDD and Hybrid "
+              "pipelines. The first action populates the cache; later actions reuse it."),
+    )
     parser.add_argument("--benchmark-runs", type=int, default=5)
     parser.add_argument(
         "--output-path",
